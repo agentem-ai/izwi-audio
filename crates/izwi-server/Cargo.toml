@@ -1,0 +1,37 @@
+[package]
+name = "izwi-server"
+description = "HTTP API server for Izwi TTS inference engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "izwi"
+path = "src/main.rs"
+
+[dependencies]
+izwi-core = { path = "../izwi-core" }
+
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+async-stream = { workspace = true }
+
+axum = { workspace = true }
+axum-extra = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+bytes = { workspace = true }
+base64 = { workspace = true }
+
+config = { workspace = true }

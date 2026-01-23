@@ -1,0 +1,53 @@
+# Izwi TTS Engine Configuration
+
+[engine]
+# Directory to store downloaded models
+# Default: ~/.local/share/izwi/models
+# models_dir = "/path/to/models"
+
+# Maximum batch size for inference
+max_batch_size = 8
+
+# Maximum sequence length (tokens)
+max_sequence_length = 4096
+
+# Chunk size for streaming (in audio tokens)
+chunk_size = 128
+
+# Data type for KV cache (float16, float32)
+kv_cache_dtype = "float16"
+
+# Enable Metal GPU acceleration (Apple Silicon)
+use_metal = true
+
+# Number of threads for CPU operations
+num_threads = 8
+
+[server]
+# Server host address
+host = "0.0.0.0"
+
+# Server port
+port = 8080
+
+# Enable CORS
+cors_enabled = true
+
+# Allowed origins for CORS (empty = allow all)
+cors_origins = []
+
+[streaming]
+# Minimum tokens before starting to stream
+min_tokens_before_stream = 4
+
+# Maximum buffer size in tokens
+max_buffer_tokens = 256
+
+# Target chunk duration in milliseconds
+chunk_duration_ms = 100
+
+# Enable crossfade between chunks
+crossfade_enabled = true
+
+# Crossfade duration in samples
+crossfade_samples = 256

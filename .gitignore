@@ -1,0 +1,32 @@
+# Rust
+/target/
+Cargo.lock
+
+# Models (large files)
+/models/
+*.safetensors
+*.bin
+*.gguf
+
+# UI
+/ui/node_modules/
+/ui/dist/
+/ui/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Test outputs
+*.wav
+*.mp3
