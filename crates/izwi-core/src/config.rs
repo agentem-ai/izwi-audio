@@ -80,46 +80,122 @@ fn default_num_threads() -> usize {
     get_num_cpus().min(8)
 }
 
-/// Model-specific configuration from config.json
+/// Model-specific configuration from config.json (Qwen3-TTS format)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelConfig {
+    #[serde(default)]
     pub architectures: Vec<String>,
+
+    #[serde(default)]
+    pub model_type: Option<String>,
+
+    #[serde(default)]
+    pub tts_bos_token_id: Option<usize>,
+
+    #[serde(default)]
+    pub tts_eos_token_id: Option<usize>,
+
+    #[serde(default)]
+    pub tts_pad_token_id: Option<usize>,
+
+    #[serde(default)]
+    pub talker_config: Option<TalkerConfig>,
+
+    #[serde(default)]
+    pub speaker_encoder_config: Option<SpeakerEncoderConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TalkerConfig {
+    #[serde(default)]
     pub hidden_size: usize,
+    #[serde(default)]
     pub intermediate_size: usize,
+    #[serde(default)]
     pub num_attention_heads: usize,
+    #[serde(default)]
     pub num_hidden_layers: usize,
+    #[serde(default)]
     pub num_key_value_heads: usize,
+    #[serde(default)]
     pub vocab_size: usize,
+    #[serde(default)]
+    pub text_vocab_size: usize,
+    #[serde(default)]
     pub max_position_embeddings: usize,
+    #[serde(default = "default_rope_theta")]
     pub rope_theta: f64,
+    #[serde(default = "default_rms_norm_eps")]
     pub rms_norm_eps: f64,
-
     #[serde(default)]
-    pub audio_vocab_size: Option<usize>,
-
+    pub num_code_groups: usize,
     #[serde(default)]
-    pub num_codebooks: Option<usize>,
+    pub code_predictor_config: Option<CodePredictorConfig>,
+}
 
+fn default_rope_theta() -> f64 {
+    1000000.0
+}
+fn default_rms_norm_eps() -> f64 {
+    1e-6
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CodePredictorConfig {
     #[serde(default)]
-    pub audio_sample_rate: Option<usize>,
+    pub hidden_size: usize,
+    #[serde(default)]
+    pub num_hidden_layers: usize,
+    #[serde(default)]
+    pub num_attention_heads: usize,
+    #[serde(default)]
+    pub num_code_groups: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SpeakerEncoderConfig {
+    #[serde(default)]
+    pub enc_dim: usize,
+    #[serde(default)]
+    pub sample_rate: usize,
+}
+
+impl ModelConfig {
+    /// Get the hidden size from talker_config
+    pub fn hidden_size(&self) -> usize {
+        self.talker_config
+            .as_ref()
+            .map(|c| c.hidden_size)
+            .unwrap_or(1024)
+    }
+
+    /// Get the number of hidden layers from talker_config
+    pub fn num_hidden_layers(&self) -> usize {
+        self.talker_config
+            .as_ref()
+            .map(|c| c.num_hidden_layers)
+            .unwrap_or(28)
+    }
+
+    /// Get the vocab size from talker_config
+    pub fn vocab_size(&self) -> usize {
+        self.talker_config
+            .as_ref()
+            .map(|c| c.text_vocab_size)
+            .unwrap_or(151936)
+    }
 }
 
 impl Default for ModelConfig {
     fn default() -> Self {
         Self {
             architectures: vec!["Qwen3TTSForConditionalGeneration".to_string()],
-            hidden_size: 1536,
-            intermediate_size: 8960,
-            num_attention_heads: 12,
-            num_hidden_layers: 28,
-            num_key_value_heads: 2,
-            vocab_size: 152064,
-            max_position_embeddings: 32768,
-            rope_theta: 1000000.0,
-            rms_norm_eps: 1e-6,
-            audio_vocab_size: Some(4096),
-            num_codebooks: Some(16),
-            audio_sample_rate: Some(24000),
+            model_type: Some("qwen3_tts".to_string()),
+            tts_bos_token_id: Some(151672),
+            tts_eos_token_id: Some(151673),
+            tts_pad_token_id: Some(151671),
+            talker_config: Some(TalkerConfig::default()),
+            speaker_encoder_config: Some(SpeakerEncoderConfig::default()),
         }
     }
 }

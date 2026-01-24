@@ -4,13 +4,14 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
-use crate::audio::{AudioChunkBuffer, AudioCodec, AudioEncoder, AudioFormat, StreamingConfig};
+use crate::audio::{AudioChunkBuffer, AudioCodec, AudioEncoder, StreamingConfig};
 use crate::config::EngineConfig;
 use crate::error::{Error, Result};
 use crate::inference::generation::{
     AudioChunk, GenerationConfig, GenerationRequest, GenerationResult,
 };
 use crate::inference::kv_cache::{KVCache, KVCacheConfig};
+use crate::inference::python_bridge::PythonBridge;
 use crate::model::{ModelInfo, ModelManager, ModelVariant};
 use crate::tokenizer::Tokenizer;
 
@@ -22,6 +23,8 @@ pub struct InferenceEngine {
     codec: AudioCodec,
     kv_cache: KVCache,
     streaming_config: StreamingConfig,
+    python_bridge: PythonBridge,
+    loaded_model_path: Option<std::path::PathBuf>,
 }
 
 impl InferenceEngine {
@@ -38,6 +41,8 @@ impl InferenceEngine {
             codec,
             kv_cache,
             streaming_config: StreamingConfig::default(),
+            python_bridge: PythonBridge::new(),
+            loaded_model_path: None,
         })
     }
 
@@ -108,6 +113,16 @@ impl InferenceEngine {
             }
         }
 
+        // Store model path for Python bridge
+        if let Some(path) = self
+            .model_manager
+            .get_model_info(variant)
+            .await
+            .and_then(|i| i.local_path)
+        {
+            self.loaded_model_path = Some(path);
+        }
+
         Ok(())
     }
 
@@ -115,34 +130,36 @@ impl InferenceEngine {
     pub async fn generate(&self, request: GenerationRequest) -> Result<GenerationResult> {
         let start_time = std::time::Instant::now();
 
-        let tokenizer = self
-            .tokenizer
+        // Get model path
+        let model_path = self
+            .loaded_model_path
             .as_ref()
-            .ok_or_else(|| Error::InferenceError("No tokenizer loaded".to_string()))?;
+            .ok_or_else(|| Error::InferenceError("No model loaded".to_string()))?;
 
-        // Tokenize input text
-        let prompt = tokenizer.format_tts_prompt(&request.text, request.config.speaker.as_deref());
-        let input_tokens = tokenizer.encode(&prompt)?;
+        info!("Generating TTS for: {}", request.text);
 
-        debug!("Input tokens: {}", input_tokens.len());
-
-        // Generate audio tokens
-        let audio_tokens = self
-            .generate_audio_tokens(&input_tokens, &request.config)
-            .await?;
-
-        debug!("Generated {} audio tokens", audio_tokens[0].len());
-
-        // Decode to waveform
-        let samples = self.codec.decode(&audio_tokens)?;
+        // Use Python bridge for actual inference
+        let (samples, sample_rate) = self.python_bridge.generate(
+            model_path,
+            &request.text,
+            request.config.speaker.as_deref(),
+            Some("Auto"), // language
+            None,         // instruct
+        )?;
 
         let total_time_ms = start_time.elapsed().as_secs_f32() * 1000.0;
+        let num_samples = samples.len();
+
+        info!(
+            "Generated {} samples in {:.1}ms",
+            num_samples, total_time_ms
+        );
 
         Ok(GenerationResult {
             request_id: request.id,
             samples,
-            sample_rate: self.codec.sample_rate(),
-            total_tokens: audio_tokens[0].len(),
+            sample_rate,
+            total_tokens: num_samples / 256, // approximate
             total_time_ms,
         })
     }
