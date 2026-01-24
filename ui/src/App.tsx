@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
-import { Volume2, Download, Loader2, AlertCircle } from "lucide-react";
-import { ModelCard } from "./components/ModelCard";
-import { TTSPanel } from "./components/TTSPanel";
+import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Cpu, AlertCircle, X, Github, Waves, ChevronRight } from "lucide-react";
+import { ModelManager } from "./components/ModelManager";
+import { VoicePlayground } from "./components/VoicePlayground";
 import { api, ModelInfo } from "./api";
 
 function App() {
@@ -9,44 +10,79 @@ function App() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<
+    Record<string, number>
+  >({});
+  const [showModels, setShowModels] = useState(true);
 
-  useEffect(() => {
-    loadModels();
-  }, []);
-
-  const loadModels = async () => {
+  const loadModels = useCallback(async () => {
     try {
-      setLoading(true);
       const response = await api.listModels();
       setModels(response.models);
 
       // Auto-select first ready model
       const readyModel = response.models.find((m) => m.status === "ready");
-      if (readyModel) {
+      if (readyModel && !selectedModel) {
         setSelectedModel(readyModel.variant);
       }
     } catch (err) {
-      setError("Failed to load models");
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Failed to load models:", err);
     }
-  };
+  }, [selectedModel]);
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await loadModels();
+      setLoading(false);
+    };
+    init();
+
+    // Poll for model status updates
+    const interval = setInterval(loadModels, 5000);
+    return () => clearInterval(interval);
+  }, [loadModels]);
 
   const handleDownload = async (variant: string) => {
     try {
-      // Update UI to show downloading
       setModels((prev) =>
         prev.map((m) =>
           m.variant === variant ? { ...m, status: "downloading" as const } : m,
         ),
       );
 
+      // Simulate progress updates (real implementation would use SSE/WebSocket)
+      const progressInterval = setInterval(() => {
+        setDownloadProgress((prev) => {
+          const current = prev[variant] || 0;
+          if (current >= 95) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return {
+            ...prev,
+            [variant]: Math.min(current + Math.random() * 15, 95),
+          };
+        });
+      }, 500);
+
       await api.downloadModel(variant);
+
+      clearInterval(progressInterval);
+      setDownloadProgress((prev) => ({ ...prev, [variant]: 100 }));
+
       await loadModels();
+
+      // Clear progress after a delay
+      setTimeout(() => {
+        setDownloadProgress((prev) => {
+          const { [variant]: _, ...rest } = prev;
+          return rest;
+        });
+      }, 1000);
     } catch (err) {
       console.error("Download failed:", err);
-      setError("Failed to download model");
+      setError("Failed to download model. Please try again.");
       await loadModels();
     }
   };
@@ -64,7 +100,7 @@ function App() {
       setSelectedModel(variant);
     } catch (err) {
       console.error("Load failed:", err);
-      setError("Failed to load model");
+      setError("Failed to load model. Please try again.");
       await loadModels();
     }
   };
@@ -81,114 +117,170 @@ function App() {
     }
   };
 
+  const readyModelsCount = models.filter((m) => m.status === "ready").length;
+
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#0a0a0f]/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-600 rounded-lg">
-                <Volume2 className="w-6 h-6 text-white" />
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                  <Waves className="w-5 h-5 text-white" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#0a0a0f]" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Izwi</h1>
-                <p className="text-sm text-gray-400">
-                  Qwen3-TTS Inference Engine
-                </p>
+                <h1 className="text-lg font-bold text-white tracking-tight">
+                  Izwi
+                </h1>
+                <p className="text-xs text-gray-500">AI Voice Playground</p>
               </div>
             </div>
+
+            {/* Status */}
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-400">Apple Silicon • MLX</span>
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08]">
+                <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-xs text-gray-400">Qwen3-TTS</span>
+                {readyModelsCount > 0 && (
+                  <span className="text-xs text-emerald-400">
+                    • {readyModelsCount} loaded
+                  </span>
+                )}
+              </div>
+              <a
+                href="https://github.com/QwenLM/Qwen3-TTS"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg hover:bg-white/[0.05] transition-colors"
+              >
+                <Github className="w-5 h-5 text-gray-400 hover:text-white" />
+              </a>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      {/* Error toast */}
+      <AnimatePresence>
         {error && (
-          <div className="mb-6 p-4 bg-red-900/20 border border-red-800 rounded-lg flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400" />
-            <span className="text-red-200">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-400 hover:text-red-300"
-            >
-              Dismiss
-            </button>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 backdrop-blur-xl shadow-xl">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <span className="text-sm text-red-200">{error}</span>
+              <button
+                onClick={() => setError(null)}
+                className="p-1 rounded-lg hover:bg-white/[0.1] transition-colors"
+              >
+                <X className="w-4 h-4 text-red-400" />
+              </button>
+            </div>
+          </motion.div>
         )}
+      </AnimatePresence>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Models Panel */}
-          <div className="lg:col-span-1">
-            <div className="card">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Download className="w-5 h-5" />
-                Models
-              </h2>
-
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {models
-                    .filter((m) => !m.variant.includes("tokenizer"))
-                    .map((model) => (
-                      <ModelCard
-                        key={model.variant}
-                        model={model}
-                        isSelected={selectedModel === model.variant}
-                        onDownload={() => handleDownload(model.variant)}
-                        onLoad={() => handleLoad(model.variant)}
-                        onUnload={() => handleUnload(model.variant)}
-                        onSelect={() => setSelectedModel(model.variant)}
-                      />
-                    ))}
-                </div>
-              )}
-
-              {/* Tokenizer section */}
-              <div className="mt-6 pt-6 border-t border-gray-800">
-                <h3 className="text-sm font-medium text-gray-400 mb-3">
-                  Audio Codec
-                </h3>
-                {models
-                  .filter((m) => m.variant.includes("tokenizer"))
-                  .map((model) => (
-                    <ModelCard
-                      key={model.variant}
-                      model={model}
-                      isSelected={false}
-                      onDownload={() => handleDownload(model.variant)}
-                      onLoad={() => handleLoad(model.variant)}
-                      onUnload={() => handleUnload(model.variant)}
-                      onSelect={() => {}}
-                      compact
-                    />
-                  ))}
+      {/* Main content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <div className="grid lg:grid-cols-[380px,1fr] gap-6">
+          {/* Models sidebar */}
+          <div className="lg:block">
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
+                  Models
+                </h2>
+                <button
+                  onClick={() => setShowModels(!showModels)}
+                  className="lg:hidden p-1 rounded hover:bg-white/[0.1]"
+                >
+                  <ChevronRight
+                    className={`w-4 h-4 text-gray-400 transition-transform ${showModels ? "rotate-90" : ""}`}
+                  />
+                </button>
               </div>
+
+              <AnimatePresence>
+                {(showModels || window.innerWidth >= 1024) && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                  >
+                    {loading ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-3">
+                        <motion.div
+                          className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                        />
+                        <p className="text-sm text-gray-500">
+                          Loading models...
+                        </p>
+                      </div>
+                    ) : (
+                      <ModelManager
+                        models={models}
+                        selectedModel={selectedModel}
+                        onDownload={handleDownload}
+                        onLoad={handleLoad}
+                        onUnload={handleUnload}
+                        onSelect={setSelectedModel}
+                        downloadProgress={downloadProgress}
+                      />
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
-          {/* TTS Panel */}
-          <div className="lg:col-span-2">
-            <TTSPanel
+          {/* Voice playground */}
+          <div>
+            <VoicePlayground
               selectedModel={selectedModel}
-              onModelRequired={() => setError("Please load a model first")}
+              onModelRequired={() =>
+                setError("Please load a model first to generate speech")
+              }
             />
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 mt-16">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <p className="text-center text-sm text-gray-500">
-            Izwi TTS Engine • Powered by Qwen3-TTS and MLX
-          </p>
+      <footer className="border-t border-white/[0.05] py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-gray-600">
+              Powered by Qwen3-TTS • Built with ❤️ for the open-source community
+            </p>
+            <div className="flex items-center gap-4">
+              <a
+                href="#"
+                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                Documentation
+              </a>
+              <a
+                href="#"
+                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                API Reference
+              </a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
