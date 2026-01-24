@@ -1,8 +1,14 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { Download, Play, Square, Check, Cpu, HardDrive } from "lucide-react";
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Download,
+  Play,
+  Square,
+  Trash2,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
 import { ModelInfo } from "../api";
-import { ProgressRing } from "./ui/ProgressRing";
-import { MiniWaveform } from "./ui/Waveform";
 import clsx from "clsx";
 
 interface ModelManagerProps {
@@ -11,50 +17,60 @@ interface ModelManagerProps {
   onDownload: (variant: string) => void;
   onLoad: (variant: string) => void;
   onUnload: (variant: string) => void;
+  onDelete: (variant: string) => void;
   onSelect: (variant: string) => void;
   downloadProgress: Record<string, number>;
 }
 
-const MODEL_INFO: Record<
+const MODEL_DETAILS: Record<
   string,
-  { name: string; description: string; size: string; badge?: string }
+  {
+    shortName: string;
+    fullName: string;
+    description: string;
+    features: string[];
+    size: string;
+  }
 > = {
   "Qwen3-TTS-12Hz-0.6B-Base": {
-    name: "Qwen3 0.6B Base",
-    description: "Voice cloning with reference audio",
+    shortName: "0.6B Base",
+    fullName: "Qwen3-TTS 12Hz 0.6B Base Model",
+    description: "Voice cloning with reference audio samples",
+    features: ["Voice cloning", "Reference audio required", "Fast inference"],
     size: "1.2 GB",
   },
   "Qwen3-TTS-12Hz-0.6B-CustomVoice": {
-    name: "Qwen3 0.6B Custom",
-    description: "9 built-in voices, fast generation",
+    shortName: "0.6B Custom",
+    fullName: "Qwen3-TTS 12Hz 0.6B CustomVoice Model",
+    description: "Pre-trained with 9 built-in voice profiles",
+    features: ["9 built-in voices", "No reference needed", "Fast generation"],
     size: "1.2 GB",
-    badge: "Recommended",
   },
   "Qwen3-TTS-12Hz-1.7B-Base": {
-    name: "Qwen3 1.7B Base",
-    description: "Higher quality voice cloning",
+    shortName: "1.7B Base",
+    fullName: "Qwen3-TTS 12Hz 1.7B Base Model",
+    description: "Higher quality voice cloning capabilities",
+    features: [
+      "Superior voice cloning",
+      "Reference audio required",
+      "Best quality",
+    ],
     size: "3.4 GB",
   },
   "Qwen3-TTS-12Hz-1.7B-CustomVoice": {
-    name: "Qwen3 1.7B Custom",
-    description: "9 voices, best quality",
+    shortName: "1.7B Custom",
+    fullName: "Qwen3-TTS 12Hz 1.7B CustomVoice Model",
+    description: "Premium quality with 9 built-in voices",
+    features: ["9 built-in voices", "Highest quality", "Natural prosody"],
     size: "3.4 GB",
-    badge: "Best Quality",
   },
   "Qwen3-TTS-12Hz-1.7B-VoiceDesign": {
-    name: "Qwen3 1.7B Design",
-    description: "Create voices from text descriptions",
+    shortName: "1.7B Design",
+    fullName: "Qwen3-TTS 12Hz 1.7B VoiceDesign Model",
+    description: "Generate voices from text descriptions",
+    features: ["Text-to-voice", "Creative control", "Unique voices"],
     size: "3.4 GB",
-    badge: "Creative",
   },
-};
-
-const formatBytes = (bytes: number | null): string => {
-  if (bytes === null) return "";
-  const gb = bytes / (1024 * 1024 * 1024);
-  if (gb >= 1) return `${gb.toFixed(1)} GB`;
-  const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(0)} MB`;
 };
 
 export function ModelManager({
@@ -63,191 +79,266 @@ export function ModelManager({
   onDownload,
   onLoad,
   onUnload,
-  onSelect,
+  onDelete,
   downloadProgress,
 }: ModelManagerProps) {
+  const [expandedModel, setExpandedModel] = useState<string | null>(null);
   const ttsModels = models.filter((m) => !m.variant.includes("Tokenizer"));
 
   return (
-    <div className="space-y-3">
-      <AnimatePresence mode="popLayout">
-        {ttsModels.map((model, index) => {
-          const info = MODEL_INFO[model.variant] || {
-            name: model.variant,
-            description: "",
-            size: formatBytes(model.size_bytes),
-          };
-          const isSelected = selectedModel === model.variant;
-          const isDownloading = model.status === "downloading";
-          const isLoading = model.status === "loading";
-          const isReady = model.status === "ready";
-          const isDownloaded = model.status === "downloaded";
-          const progress =
-            downloadProgress[model.variant] || model.download_progress || 0;
+    <div className="space-y-2">
+      {ttsModels.map((model) => {
+        const details = MODEL_DETAILS[model.variant] || {
+          shortName: model.variant,
+          fullName: model.variant,
+          description: "",
+          features: [],
+          size: "",
+        };
 
-          return (
-            <motion.div
-              key={model.variant}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ delay: index * 0.05 }}
+        const isSelected = selectedModel === model.variant;
+        const isExpanded = expandedModel === model.variant;
+        const isDownloading = model.status === "downloading";
+        const isLoading = model.status === "loading";
+        const isReady = model.status === "ready";
+        const isDownloaded = model.status === "downloaded";
+        const progress =
+          downloadProgress[model.variant] || model.download_progress || 0;
+
+        return (
+          <div
+            key={model.variant}
+            className={clsx(
+              "border rounded-lg transition-colors",
+              isSelected
+                ? "border-white/20 bg-[#1a1a1a]"
+                : "border-[#2a2a2a] bg-[#161616]",
+            )}
+          >
+            {/* Main card */}
+            <div
               className={clsx(
-                "relative p-4 rounded-xl border transition-all duration-200 cursor-pointer group",
-                isSelected
-                  ? "bg-indigo-500/10 border-indigo-500/50 shadow-lg shadow-indigo-500/10"
-                  : "bg-white/[0.02] border-white/[0.08] hover:bg-white/[0.05] hover:border-white/[0.15]",
+                "p-3 cursor-pointer",
+                !isExpanded && "hover:bg-[#1a1a1a]",
               )}
-              onClick={() => isReady && onSelect(model.variant)}
+              onClick={() =>
+                setExpandedModel(isExpanded ? null : model.variant)
+              }
             >
-              {/* Badge */}
-              {info.badge && (
-                <div className="absolute -top-2 right-3">
-                  <span
-                    className={clsx(
-                      "text-[10px] font-semibold px-2 py-0.5 rounded-full",
-                      info.badge === "Recommended" &&
-                        "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
-                      info.badge === "Best Quality" &&
-                        "bg-purple-500/20 text-purple-400 border border-purple-500/30",
-                      info.badge === "Creative" &&
-                        "bg-amber-500/20 text-amber-400 border border-amber-500/30",
-                    )}
-                  >
-                    {info.badge}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-4">
-                {/* Status indicator / Progress */}
+              <div className="flex items-center gap-3">
+                {/* Status indicator */}
                 <div className="flex-shrink-0">
                   {isDownloading ? (
-                    <ProgressRing
-                      progress={progress}
-                      size={44}
-                      strokeWidth={3}
-                    />
+                    <div className="relative w-8 h-8">
+                      <svg className="w-8 h-8 transform -rotate-90">
+                        <circle
+                          cx="16"
+                          cy="16"
+                          r="14"
+                          fill="none"
+                          stroke="#2a2a2a"
+                          strokeWidth="2"
+                        />
+                        <circle
+                          cx="16"
+                          cy="16"
+                          r="14"
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth="2"
+                          strokeDasharray={`${2 * Math.PI * 14}`}
+                          strokeDashoffset={`${2 * Math.PI * 14 * (1 - progress / 100)}`}
+                          strokeLinecap="round"
+                          className="transition-all duration-300"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center text-[10px] text-white font-medium">
+                        {Math.round(progress)}
+                      </div>
+                    </div>
                   ) : isLoading ? (
-                    <div className="w-11 h-11 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                      <motion.div
-                        className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full"
-                        animate={{ rotate: 360 }}
-                        transition={{
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                      />
-                    </div>
-                  ) : isReady ? (
-                    <div className="w-11 h-11 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                      {isSelected ? (
-                        <MiniWaveform isActive />
-                      ) : (
-                        <Check className="w-5 h-5 text-emerald-400" />
-                      )}
-                    </div>
-                  ) : isDownloaded ? (
-                    <div className="w-11 h-11 rounded-full bg-blue-500/20 flex items-center justify-center">
-                      <HardDrive className="w-5 h-5 text-blue-400" />
-                    </div>
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
                   ) : (
-                    <div className="w-11 h-11 rounded-full bg-white/[0.05] flex items-center justify-center">
-                      <Cpu className="w-5 h-5 text-gray-500" />
-                    </div>
+                    <div
+                      className={clsx(
+                        "w-2 h-2 rounded-full",
+                        isReady && "bg-green-500",
+                        isDownloaded && "bg-blue-500",
+                        model.status === "not_downloaded" && "bg-gray-600",
+                      )}
+                    />
                   )}
                 </div>
 
                 {/* Model info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-white truncate">
-                      {info.name}
-                    </h3>
+                    <span className="text-sm font-medium text-white">
+                      {details.shortName}
+                    </span>
                     {isSelected && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500 text-white">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-white/10 text-white rounded">
                         ACTIVE
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 truncate">
-                    {info.description}
-                  </p>
-
-                  {/* Download progress text */}
-                  {isDownloading && (
-                    <p className="text-xs text-amber-400 mt-1">
-                      Downloading... {progress.toFixed(0)}%
-                    </p>
-                  )}
-                  {isLoading && (
-                    <p className="text-xs text-indigo-400 mt-1">
-                      Loading model into memory...
-                    </p>
-                  )}
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {details.size}
+                    {isDownloading && ` • ${progress.toFixed(0)}% downloaded`}
+                    {isLoading && " • Loading..."}
+                  </div>
                 </div>
 
-                {/* Size badge */}
-                <div className="hidden sm:block text-xs text-gray-500 bg-white/[0.05] px-2 py-1 rounded">
-                  {info.size}
-                </div>
-
-                {/* Action button */}
-                <div className="flex-shrink-0">
-                  {model.status === "not_downloaded" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDownload(model.variant);
-                      }}
-                      className="btn btn-secondary text-sm py-2 px-3"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span className="hidden sm:inline">Download</span>
-                    </button>
+                {/* Expand icon */}
+                <ChevronRight
+                  className={clsx(
+                    "w-4 h-4 text-gray-500 transition-transform flex-shrink-0",
+                    isExpanded && "rotate-90",
                   )}
-                  {isDownloaded && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onLoad(model.variant);
-                      }}
-                      className="btn btn-primary text-sm py-2 px-3"
-                    >
-                      <Play className="w-4 h-4" />
-                      <span className="hidden sm:inline">Load</span>
-                    </button>
-                  )}
-                  {isReady && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUnload(model.variant);
-                      }}
-                      className="btn btn-danger text-sm py-2 px-3"
-                    >
-                      <Square className="w-4 h-4" />
-                      <span className="hidden sm:inline">Unload</span>
-                    </button>
-                  )}
-                </div>
+                />
               </div>
 
-              {/* Progress bar for downloading */}
+              {/* Progress bar */}
               {isDownloading && (
-                <div className="mt-3 progress-bar">
-                  <motion.div
-                    className="progress-bar-fill"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
+                <div className="mt-2 h-1 bg-[#1f1f1f] rounded-sm overflow-hidden">
+                  <div
+                    className="h-full bg-white rounded-sm transition-all duration-300"
+                    style={{ width: `${progress}%` }}
                   />
                 </div>
               )}
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+            </div>
+
+            {/* Expanded details */}
+            <AnimatePresence>
+              {isExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden border-t border-[#2a2a2a]"
+                >
+                  <div className="p-3 space-y-3">
+                    {/* Full name */}
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Model</div>
+                      <div className="text-sm text-white font-mono">
+                        {details.fullName}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">
+                        Description
+                      </div>
+                      <div className="text-sm text-gray-300">
+                        {details.description}
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    {details.features.length > 0 && (
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">
+                          Features
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {details.features.map((feature, i) => (
+                            <span
+                              key={i}
+                              className="text-xs px-2 py-1 bg-[#1f1f1f] text-gray-400 rounded"
+                            >
+                              {feature}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 pt-2">
+                      {model.status === "not_downloaded" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDownload(model.variant);
+                          }}
+                          className="btn btn-primary text-sm flex-1"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </button>
+                      )}
+
+                      {isDownloaded && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onLoad(model.variant);
+                            }}
+                            className="btn btn-primary text-sm flex-1"
+                          >
+                            <Play className="w-4 h-4" />
+                            Load
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (
+                                confirm(
+                                  `Delete ${details.shortName}? This will remove all downloaded files.`,
+                                )
+                              ) {
+                                onDelete(model.variant);
+                              }
+                            }}
+                            className="btn btn-danger text-sm"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+
+                      {isReady && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onUnload(model.variant);
+                            }}
+                            className="btn btn-secondary text-sm flex-1"
+                          >
+                            <Square className="w-4 h-4" />
+                            Unload
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (
+                                confirm(
+                                  `Delete ${details.shortName}? This will unload and remove all files.`,
+                                )
+                              ) {
+                                onDelete(model.variant);
+                              }
+                            }}
+                            className="btn btn-danger text-sm"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
     </div>
   );
 }
