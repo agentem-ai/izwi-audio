@@ -35,6 +35,10 @@ pub struct TTSRequest {
     #[serde(default)]
     pub reference_audio: Option<String>,
 
+    /// Reference text (transcript of reference audio)
+    #[serde(default)]
+    pub reference_text: Option<String>,
+
     /// Output format (wav, raw_f32, raw_i16)
     #[serde(default = "default_format")]
     pub format: String,

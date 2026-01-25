@@ -56,6 +56,7 @@ def generate_tts(request: dict) -> dict:
     """Generate TTS audio from text."""
     import torch
     import soundfile as sf
+    import numpy as np
     from qwen_tts import Qwen3TTSModel
 
     model_path = request.get("model_path", "")
@@ -65,6 +66,11 @@ def generate_tts(request: dict) -> dict:
     )  # Valid: aiden, dylan, eric, ono_anna, ryan, serena, sohee, uncle_fu, vivian
     language = request.get("language", "Auto")
     instruct = request.get("instruct", "")
+
+    # Voice cloning parameters
+    ref_audio_b64 = request.get("ref_audio_base64", None)
+    ref_text = request.get("ref_text", None)
+    use_voice_clone = request.get("use_voice_clone", False)
 
     # Use HuggingFace model ID instead of local path
     model_id = get_hf_model_id(model_path)
@@ -96,7 +102,31 @@ def generate_tts(request: dict) -> dict:
 
     # Generate audio based on model type
     try:
-        if "CustomVoice" in model_id:
+        # Voice cloning with Base models
+        if use_voice_clone and "Base" in model_id and ref_audio_b64 and ref_text:
+            # Decode base64 audio to numpy array
+            audio_bytes = base64.b64decode(ref_audio_b64)
+
+            # Save to temp file to load with soundfile
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                ref_audio_path = f.name
+                f.write(audio_bytes)
+
+            try:
+                # Load reference audio
+                ref_audio_array, ref_sr = sf.read(ref_audio_path)
+
+                # Generate with voice cloning
+                wavs, sr = model.generate_voice_clone(
+                    text=text,
+                    language=language,
+                    ref_audio=(ref_audio_array, ref_sr),
+                    ref_text=ref_text,
+                )
+            finally:
+                os.unlink(ref_audio_path)
+
+        elif "CustomVoice" in model_id:
             wavs, sr = model.generate_custom_voice(
                 text=text,
                 language=language,
@@ -110,14 +140,11 @@ def generate_tts(request: dict) -> dict:
                 instruct=instruct if instruct else "Natural speaking voice.",
             )
         else:
-            # Base model - simple generation without voice clone
-            # For base models, we need ref_audio for voice clone
-            # Without ref_audio, generate with default voice
-            wavs, sr = model.generate_custom_voice(
-                text=text,
-                language=language,
-                speaker=speaker,
-            )
+            # Base model without voice clone - use default generation
+            return {
+                "error": "Base models require voice cloning. Please provide reference audio and transcript."
+            }
+
     except Exception as e:
         return {"error": f"Generation failed: {str(e)}"}
 

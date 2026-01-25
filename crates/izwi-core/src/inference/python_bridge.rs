@@ -18,6 +18,9 @@ pub struct PythonTTSRequest {
     pub speaker: Option<String>,
     pub language: Option<String>,
     pub instruct: Option<String>,
+    pub use_voice_clone: Option<bool>,
+    pub ref_audio_base64: Option<String>,
+    pub ref_text: Option<String>,
 }
 
 /// Response from Python inference script
@@ -85,7 +88,23 @@ impl PythonBridge {
         language: Option<&str>,
         instruct: Option<&str>,
     ) -> Result<(Vec<f32>, u32)> {
+        self.generate_with_clone(model_path, text, speaker, language, instruct, None, None)
+    }
+
+    /// Generate TTS audio with voice cloning
+    pub fn generate_with_clone(
+        &self,
+        model_path: &Path,
+        text: &str,
+        speaker: Option<&str>,
+        language: Option<&str>,
+        instruct: Option<&str>,
+        ref_audio_base64: Option<String>,
+        ref_text: Option<String>,
+    ) -> Result<(Vec<f32>, u32)> {
         info!("Calling Python TTS for text: {}", text);
+
+        let use_voice_clone = ref_audio_base64.is_some() && ref_text.is_some();
 
         let request = PythonTTSRequest {
             command: "generate".to_string(),
@@ -94,6 +113,9 @@ impl PythonBridge {
             speaker: speaker.map(|s| s.to_string()),
             language: language.map(|s| s.to_string()),
             instruct: instruct.map(|s| s.to_string()),
+            use_voice_clone: Some(use_voice_clone),
+            ref_audio_base64,
+            ref_text,
         };
 
         let request_json = serde_json::to_string(&request)

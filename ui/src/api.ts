@@ -24,6 +24,7 @@ export interface TTSRequest {
   speaker?: string;
   voice_description?: string;
   reference_audio?: string;
+  reference_text?: string;
   format?: "wav" | "raw_f32" | "raw_i16";
   temperature?: number;
   speed?: number;

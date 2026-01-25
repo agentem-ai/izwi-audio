@@ -7,8 +7,10 @@ import {
   ChevronDown,
   Volume2,
   Loader2,
+  User,
 } from "lucide-react";
 import { api } from "../api";
+import { VoiceClone } from "./VoiceClone";
 import clsx from "clsx";
 
 interface VoicePlaygroundProps {
@@ -44,9 +46,16 @@ export function VoicePlayground({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [useVoiceClone, setUseVoiceClone] = useState(false);
+  const [voiceCloneAudio, setVoiceCloneAudio] = useState<string | null>(null);
+  const [voiceCloneTranscript, setVoiceCloneTranscript] = useState<
+    string | null
+  >(null);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const isBaseModel = selectedModel?.includes("Base") || false;
 
   const handleGenerate = async () => {
     if (!selectedModel) {
@@ -70,7 +79,13 @@ export function VoicePlayground({
 
       const blob = await api.generateTTS({
         text: text.trim(),
-        speaker,
+        speaker: useVoiceClone ? undefined : speaker,
+        reference_audio: useVoiceClone
+          ? voiceCloneAudio || undefined
+          : undefined,
+        reference_text: useVoiceClone
+          ? voiceCloneTranscript || undefined
+          : undefined,
       });
 
       const url = URL.createObjectURL(blob);
@@ -206,6 +221,33 @@ export function VoicePlayground({
             </button>
           ))}
         </div>
+
+        {/* Voice Cloning Section (for Base models) */}
+        {isBaseModel && (
+          <div className="p-3 rounded-lg bg-[#161616] border border-[#2a2a2a]">
+            <div className="flex items-center gap-2 mb-3">
+              <User className="w-4 h-4 text-gray-500" />
+              <span className="text-xs font-medium text-white">
+                Voice Cloning
+              </span>
+              <span className="text-xs text-gray-600">
+                (Required for Base models)
+              </span>
+            </div>
+            <VoiceClone
+              onVoiceCloneReady={(audio, transcript) => {
+                setVoiceCloneAudio(audio);
+                setVoiceCloneTranscript(transcript);
+                setUseVoiceClone(true);
+              }}
+              onClear={() => {
+                setVoiceCloneAudio(null);
+                setVoiceCloneTranscript(null);
+                setUseVoiceClone(false);
+              }}
+            />
+          </div>
+        )}
 
         {/* Error */}
         <AnimatePresence>
