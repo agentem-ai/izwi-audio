@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, X, Github, Waves, ChevronRight } from "lucide-react";
 import { ModelManager } from "./components/ModelManager";
-import { VoicePlayground } from "./components/VoicePlayground";
+import { ViewSwitcher } from "./components/ViewSwitcher";
+import { CustomVoicePlayground } from "./components/CustomVoicePlayground";
+import { VoiceClonePlayground } from "./components/VoiceClonePlayground";
+import { VoiceDesignPlayground } from "./components/VoiceDesignPlayground";
 import { api, ModelInfo } from "./api";
+import { ViewMode, VIEW_CONFIGS } from "./types";
 
 function App() {
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -14,6 +18,7 @@ function App() {
     Record<string, number>
   >({});
   const [showModels, setShowModels] = useState(true);
+  const [currentView, setCurrentView] = useState<ViewMode>("custom-voice");
 
   const loadModels = useCallback(async () => {
     try {
@@ -140,6 +145,46 @@ function App() {
 
   const readyModelsCount = models.filter((m) => m.status === "ready").length;
 
+  const currentViewConfig = VIEW_CONFIGS[currentView];
+
+  const modelCounts = useMemo(() => {
+    const counts: Record<ViewMode, { total: number; ready: number }> = {
+      "custom-voice": { total: 0, ready: 0 },
+      "voice-clone": { total: 0, ready: 0 },
+      "voice-design": { total: 0, ready: 0 },
+    };
+
+    models
+      .filter((m) => !m.variant.includes("Tokenizer"))
+      .forEach((model) => {
+        Object.entries(VIEW_CONFIGS).forEach(([viewId, config]) => {
+          if (config.modelFilter(model.variant)) {
+            counts[viewId as ViewMode].total++;
+            if (model.status === "ready") {
+              counts[viewId as ViewMode].ready++;
+            }
+          }
+        });
+      });
+
+    return counts;
+  }, [models]);
+
+  const relevantSelectedModel = useMemo(() => {
+    if (!selectedModel) return null;
+    if (currentViewConfig.modelFilter(selectedModel)) {
+      return selectedModel;
+    }
+    const readyModel = models.find(
+      (m) => m.status === "ready" && currentViewConfig.modelFilter(m.variant),
+    );
+    return readyModel?.variant || null;
+  }, [selectedModel, currentView, models, currentViewConfig]);
+
+  const handleViewChange = (view: ViewMode) => {
+    setCurrentView(view);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#0d0d0d]">
       {/* Header */}
@@ -205,12 +250,26 @@ function App() {
 
       {/* Main content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        {/* View Switcher */}
+        <div className="mb-6">
+          <ViewSwitcher
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            modelCounts={modelCounts}
+          />
+        </div>
+
         <div className="grid lg:grid-cols-[380px,1fr] gap-6">
           {/* Models sidebar */}
           <div className="lg:block">
             <div className="card p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-medium text-white">Models</h2>
+                <div>
+                  <h2 className="text-sm font-medium text-white">Models</h2>
+                  <p className="text-[10px] text-gray-600 mt-0.5">
+                    {currentViewConfig.label} compatible
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowModels(!showModels)}
                   className="lg:hidden p-1 rounded hover:bg-[#1a1a1a]"
@@ -244,13 +303,18 @@ function App() {
                     ) : (
                       <ModelManager
                         models={models}
-                        selectedModel={selectedModel}
+                        selectedModel={relevantSelectedModel}
                         onDownload={handleDownload}
                         onLoad={handleLoad}
                         onUnload={handleUnload}
                         onDelete={handleDelete}
                         onSelect={setSelectedModel}
                         downloadProgress={downloadProgress}
+                        modelFilter={currentViewConfig.modelFilter}
+                        emptyStateTitle={currentViewConfig.emptyStateTitle}
+                        emptyStateDescription={
+                          currentViewConfig.emptyStateDescription
+                        }
                       />
                     )}
                   </motion.div>
@@ -259,14 +323,60 @@ function App() {
             </div>
           </div>
 
-          {/* Voice playground */}
+          {/* Playground area */}
           <div>
-            <VoicePlayground
-              selectedModel={selectedModel}
-              onModelRequired={() =>
-                setError("Please load a model first to generate speech")
-              }
-            />
+            <AnimatePresence mode="wait">
+              {currentView === "custom-voice" && (
+                <motion.div
+                  key="custom-voice"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <CustomVoicePlayground
+                    selectedModel={relevantSelectedModel}
+                    onModelRequired={() =>
+                      setError("Please load a CustomVoice model first")
+                    }
+                  />
+                </motion.div>
+              )}
+
+              {currentView === "voice-clone" && (
+                <motion.div
+                  key="voice-clone"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <VoiceClonePlayground
+                    selectedModel={relevantSelectedModel}
+                    onModelRequired={() =>
+                      setError("Please load a Base model first")
+                    }
+                  />
+                </motion.div>
+              )}
+
+              {currentView === "voice-design" && (
+                <motion.div
+                  key="voice-design"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <VoiceDesignPlayground
+                    selectedModel={relevantSelectedModel}
+                    onModelRequired={() =>
+                      setError("Please load the VoiceDesign model first")
+                    }
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </main>

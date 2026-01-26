@@ -20,6 +20,9 @@ interface ModelManagerProps {
   onDelete: (variant: string) => void;
   onSelect: (variant: string) => void;
   downloadProgress: Record<string, number>;
+  modelFilter?: (variant: string) => boolean;
+  emptyStateTitle?: string;
+  emptyStateDescription?: string;
 }
 
 const MODEL_DETAILS: Record<
@@ -80,10 +83,32 @@ export function ModelManager({
   onLoad,
   onUnload,
   onDelete,
+  onSelect,
   downloadProgress,
+  modelFilter,
+  emptyStateTitle,
+  emptyStateDescription,
 }: ModelManagerProps) {
   const [expandedModel, setExpandedModel] = useState<string | null>(null);
-  const ttsModels = models.filter((m) => !m.variant.includes("Tokenizer"));
+  const ttsModels = models
+    .filter((m) => !m.variant.includes("Tokenizer"))
+    .filter((m) => (modelFilter ? modelFilter(m.variant) : true));
+
+  if (ttsModels.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <div className="w-12 h-12 rounded-full bg-[#1a1a1a] flex items-center justify-center mb-3">
+          <Download className="w-5 h-5 text-gray-500" />
+        </div>
+        <h3 className="text-sm font-medium text-gray-300 mb-1">
+          {emptyStateTitle || "No Models Available"}
+        </h3>
+        <p className="text-xs text-gray-600 max-w-[200px]">
+          {emptyStateDescription || "Download models to get started"}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -121,9 +146,12 @@ export function ModelManager({
                 "p-3 cursor-pointer",
                 !isExpanded && "hover:bg-[#1a1a1a]",
               )}
-              onClick={() =>
-                setExpandedModel(isExpanded ? null : model.variant)
-              }
+              onClick={() => {
+                if (isReady && !isSelected) {
+                  onSelect(model.variant);
+                }
+                setExpandedModel(isExpanded ? null : model.variant);
+              }}
             >
               <div className="flex items-center gap-3">
                 {/* Status indicator */}
