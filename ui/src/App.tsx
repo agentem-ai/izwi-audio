@@ -197,8 +197,10 @@ function App() {
                 <Waves className="w-4 h-4 text-black" />
               </div>
               <div>
-                <h1 className="text-base font-semibold text-white">Izwi</h1>
-                <p className="text-xs text-gray-600">TTS Playground</p>
+                <h1 className="text-base font-semibold text-white">
+                  Izwi Audio
+                </h1>
+                <p className="text-xs text-gray-400">TTS Playground</p>
               </div>
             </div>
 
@@ -266,7 +268,7 @@ function App() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h2 className="text-sm font-medium text-white">Models</h2>
-                  <p className="text-[10px] text-gray-600 mt-0.5">
+                  <p className="text-[10px] text-gray-400 mt-0.5">
                     {currentViewConfig.label} compatible
                   </p>
                 </div>
@@ -298,7 +300,7 @@ function App() {
                             ease: "linear",
                           }}
                         />
-                        <p className="text-xs text-gray-600">Loading...</p>
+                        <p className="text-xs text-gray-400">Loading...</p>
                       </div>
                     ) : (
                       <ModelManager
@@ -385,7 +387,7 @@ function App() {
       <footer className="border-t border-white/[0.05] py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-400">
               Powered by Qwen3-TTS • Built with ❤️ for the open-source community
             </p>
             <div className="flex items-center gap-4">

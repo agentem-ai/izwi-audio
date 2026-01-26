@@ -30,7 +30,9 @@ export function VoiceClonePlayground({
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [voiceCloneAudio, setVoiceCloneAudio] = useState<string | null>(null);
-  const [voiceCloneTranscript, setVoiceCloneTranscript] = useState<string | null>(null);
+  const [voiceCloneTranscript, setVoiceCloneTranscript] = useState<
+    string | null
+  >(null);
   const [isVoiceReady, setIsVoiceReady] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -128,7 +130,7 @@ export function VoiceClonePlayground({
           </div>
           <div>
             <h2 className="text-sm font-medium text-white">Voice Cloning</h2>
-            <p className="text-xs text-gray-600 mt-0.5">
+            <p className="text-xs text-gray-400 mt-0.5">
               Clone any voice with a reference audio sample
             </p>
           </div>
@@ -147,7 +149,7 @@ export function VoiceClonePlayground({
             <ChevronDown
               className={clsx(
                 "w-3.5 h-3.5 text-gray-500 transition-transform",
-                showLanguageSelect && "rotate-180"
+                showLanguageSelect && "rotate-180",
               )}
             />
           </button>
@@ -171,7 +173,7 @@ export function VoiceClonePlayground({
                       "w-full px-2 py-1.5 rounded text-left text-sm transition-colors",
                       language === lang.id
                         ? "bg-white/10 text-white"
-                        : "hover:bg-[#2a2a2a] text-gray-400"
+                        : "hover:bg-[#2a2a2a] text-gray-400",
                     )}
                   >
                     {lang.name}
@@ -188,7 +190,9 @@ export function VoiceClonePlayground({
         <div className="p-3 rounded-lg bg-[#161616] border border-[#2a2a2a]">
           <div className="flex items-center gap-2 mb-3">
             <Users className="w-4 h-4 text-green-400" />
-            <span className="text-xs font-medium text-white">Voice Reference</span>
+            <span className="text-xs font-medium text-white">
+              Voice Reference
+            </span>
             {isVoiceReady && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-950/50 text-green-400 border border-green-800/50">
                 Ready
@@ -220,7 +224,7 @@ export function VoiceClonePlayground({
               <span
                 className={clsx(
                   "text-xs",
-                  text.length > 500 ? "text-red-400" : "text-gray-600"
+                  text.length > 500 ? "text-red-400" : "text-gray-600",
                 )}
               >
                 {text.length}
@@ -263,7 +267,7 @@ export function VoiceClonePlayground({
             disabled={generating || !selectedModel || !isVoiceReady}
             className={clsx(
               "btn flex-1",
-              generating ? "btn-secondary" : "btn-primary"
+              generating ? "btn-secondary" : "btn-primary",
             )}
           >
             {generating ? (
@@ -295,13 +299,13 @@ export function VoiceClonePlayground({
         </div>
 
         {!selectedModel && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-400">
             Load a Base model to clone voices
           </p>
         )}
 
         {selectedModel && !isVoiceReady && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-400">
             Record or upload a voice sample to get started
           </p>
         )}

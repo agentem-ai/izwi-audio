@@ -111,7 +111,7 @@ export function CustomVoicePlayground({
           </div>
           <div>
             <h2 className="text-sm font-medium text-white">Text to Speech</h2>
-            <p className="text-xs text-gray-600 mt-0.5">
+            <p className="text-xs text-gray-400 mt-0.5">
               Generate speech with built-in voice profiles
             </p>
           </div>
@@ -126,11 +126,13 @@ export function CustomVoicePlayground({
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] font-medium text-white">
               {speaker.charAt(0)}
             </div>
-            <span className="text-white">{selectedSpeaker?.name || speaker}</span>
+            <span className="text-white">
+              {selectedSpeaker?.name || speaker}
+            </span>
             <ChevronDown
               className={clsx(
                 "w-3.5 h-3.5 text-gray-500 transition-transform",
-                showSpeakerSelect && "rotate-180"
+                showSpeakerSelect && "rotate-180",
               )}
             />
           </button>
@@ -152,19 +154,19 @@ export function CustomVoicePlayground({
                     }}
                     className={clsx(
                       "w-full px-3 py-2 rounded text-left transition-colors flex items-center gap-3",
-                      speaker === s.id
-                        ? "bg-white/10"
-                        : "hover:bg-[#2a2a2a]"
+                      speaker === s.id ? "bg-white/10" : "hover:bg-[#2a2a2a]",
                     )}
                   >
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
                       {s.name.charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className={clsx(
-                        "text-sm font-medium",
-                        speaker === s.id ? "text-white" : "text-gray-300"
-                      )}>
+                      <div
+                        className={clsx(
+                          "text-sm font-medium",
+                          speaker === s.id ? "text-white" : "text-gray-300",
+                        )}
+                      >
                         {s.name}
                       </div>
                       <div className="text-[10px] text-gray-500 truncate">
@@ -198,7 +200,7 @@ export function CustomVoicePlayground({
             <span
               className={clsx(
                 "text-xs",
-                text.length > 500 ? "text-red-400" : "text-gray-600"
+                text.length > 500 ? "text-red-400" : "text-gray-600",
               )}
             >
               {text.length}
@@ -229,7 +231,7 @@ export function CustomVoicePlayground({
           <ChevronDown
             className={clsx(
               "w-3 h-3 transition-transform",
-              showInstruct && "rotate-180"
+              showInstruct && "rotate-180",
             )}
           />
         </button>
@@ -253,7 +255,7 @@ export function CustomVoicePlayground({
                   placeholder="e.g., 'Speak with excitement' or 'Very calm and soothing'"
                   className="input text-sm"
                 />
-                <p className="text-[10px] text-gray-600 mt-1.5">
+                <p className="text-[10px] text-gray-400 mt-1.5">
                   Optional: Guide the emotional tone and speaking style
                 </p>
               </div>
@@ -282,7 +284,7 @@ export function CustomVoicePlayground({
             disabled={generating || !selectedModel}
             className={clsx(
               "btn flex-1",
-              generating ? "btn-secondary" : "btn-primary"
+              generating ? "btn-secondary" : "btn-primary",
             )}
           >
             {generating ? (
@@ -311,7 +313,7 @@ export function CustomVoicePlayground({
         </div>
 
         {!selectedModel && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-400">
             Load a CustomVoice model to generate speech
           </p>
         )}

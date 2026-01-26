@@ -38,7 +38,7 @@ export function ViewSwitcher({
               "relative flex-1 flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
               isActive
                 ? "bg-[#1a1a1a] border border-[#2a2a2a]"
-                : "hover:bg-[#161616] border border-transparent"
+                : "hover:bg-[#161616] border border-transparent",
             )}
           >
             {isActive && (
@@ -53,7 +53,9 @@ export function ViewSwitcher({
               <div
                 className={clsx(
                   "p-2 rounded-lg transition-colors",
-                  isActive ? "bg-white text-black" : "bg-[#1f1f1f] text-gray-400"
+                  isActive
+                    ? "bg-white text-black"
+                    : "bg-[#1f1f1f] text-gray-400",
                 )}
               >
                 <Icon className="w-4 h-4" />
@@ -64,7 +66,7 @@ export function ViewSwitcher({
                   <span
                     className={clsx(
                       "text-sm font-medium transition-colors",
-                      isActive ? "text-white" : "text-gray-400"
+                      isActive ? "text-white" : "text-gray-400",
                     )}
                   >
                     {view.label}
@@ -73,7 +75,7 @@ export function ViewSwitcher({
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                   )}
                 </div>
-                <span className="text-xs text-gray-600 hidden sm:block">
+                <span className="text-xs text-gray-400 hidden sm:block">
                   {view.description}
                 </span>
               </div>

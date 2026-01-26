@@ -120,7 +120,7 @@ export function VoiceDesignPlayground({
           </div>
           <div>
             <h2 className="text-sm font-medium text-white">Voice Design</h2>
-            <p className="text-xs text-gray-600 mt-0.5">
+            <p className="text-xs text-gray-400 mt-0.5">
               Create unique voices from text descriptions
             </p>
           </div>
@@ -139,7 +139,7 @@ export function VoiceDesignPlayground({
             <ChevronDown
               className={clsx(
                 "w-3.5 h-3.5 text-gray-500 transition-transform",
-                showLanguageSelect && "rotate-180"
+                showLanguageSelect && "rotate-180",
               )}
             />
           </button>
@@ -163,7 +163,7 @@ export function VoiceDesignPlayground({
                       "w-full px-2 py-1.5 rounded text-left text-sm transition-colors",
                       language === lang.id
                         ? "bg-white/10 text-white"
-                        : "hover:bg-[#2a2a2a] text-gray-400"
+                        : "hover:bg-[#2a2a2a] text-gray-400",
                     )}
                   >
                     {lang.name}
@@ -226,8 +226,9 @@ export function VoiceDesignPlayground({
             rows={3}
             className="textarea text-sm"
           />
-          <p className="text-[10px] text-gray-600 mt-1.5">
-            Describe voice characteristics like gender, age, tone, emotion, accent, and speaking style
+          <p className="text-[10px] text-gray-400 mt-1.5">
+            Describe voice characteristics like gender, age, tone, emotion,
+            accent, and speaking style
           </p>
         </div>
 
@@ -250,7 +251,7 @@ export function VoiceDesignPlayground({
               <span
                 className={clsx(
                   "text-xs",
-                  text.length > 500 ? "text-red-400" : "text-gray-600"
+                  text.length > 500 ? "text-red-400" : "text-gray-600",
                 )}
               >
                 {text.length}
@@ -293,7 +294,7 @@ export function VoiceDesignPlayground({
             disabled={generating || !selectedModel}
             className={clsx(
               "btn flex-1",
-              generating ? "btn-secondary" : "btn-primary"
+              generating ? "btn-secondary" : "btn-primary",
             )}
           >
             {generating ? (
@@ -325,7 +326,7 @@ export function VoiceDesignPlayground({
         </div>
 
         {!selectedModel && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-400">
             Load a VoiceDesign model to create unique voices
           </p>
         )}
