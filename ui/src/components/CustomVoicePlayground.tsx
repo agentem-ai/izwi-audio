@@ -59,6 +59,7 @@ export function CustomVoicePlayground({
       const blob = await api.generateTTS({
         text: text.trim(),
         speaker: speaker,
+        voice_description: instruct.trim() || undefined,
       });
 
       const url = URL.createObjectURL(blob);

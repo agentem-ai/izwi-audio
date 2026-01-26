@@ -139,12 +139,13 @@ impl InferenceEngine {
         info!("Generating TTS for: {}", request.text);
 
         // Use Python bridge for actual inference
+        // voice_description is passed as instruct for VoiceDesign models
         let (samples, sample_rate) = self.python_bridge.generate_with_clone(
             model_path,
             &request.text,
             request.config.speaker.as_deref(),
-            Some("Auto"), // language
-            None,         // instruct
+            Some("Auto"),                         // language
+            request.voice_description.as_deref(), // instruct (used for voice design)
             request.reference_audio,
             request.reference_text,
         )?;
