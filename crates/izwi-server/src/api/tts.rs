@@ -80,6 +80,11 @@ pub async fn generate(
     Json(req): Json<TTSRequest>,
 ) -> Result<Response<Body>, ApiError> {
     info!("TTS request: {} chars", req.text.len());
+    info!(
+        "Voice clone - ref_audio: {}, ref_text: {}",
+        req.reference_audio.is_some(),
+        req.reference_text.is_some()
+    );
 
     let engine = state.engine.read().await;
 

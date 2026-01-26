@@ -184,10 +184,54 @@ impl PythonBridge {
         let stream = UnixStream::connect(&self.socket_path)
             .map_err(|e| Error::InferenceError(format!("Failed to connect to daemon: {}", e)))?;
 
-        stream.set_read_timeout(Some(Duration::from_secs(120))).ok();
-        stream.set_write_timeout(Some(Duration::from_secs(30))).ok();
+        // Set longer timeouts for voice cloning which can take minutes
+        // Use 5 minutes for read (generation can be slow) and 60s for write
+        stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
+        stream.set_write_timeout(Some(Duration::from_secs(60))).ok();
+
+        // Ensure socket is in blocking mode
+        stream.set_nonblocking(false).ok();
 
         Ok(stream)
+    }
+
+    /// Read exactly n bytes with retry on EAGAIN/WouldBlock
+    fn read_exact_with_retry(
+        stream: &mut UnixStream,
+        buf: &mut [u8],
+        max_retries: u32,
+    ) -> std::io::Result<()> {
+        let mut total_read = 0;
+        let mut retries = 0;
+
+        while total_read < buf.len() {
+            match stream.read(&mut buf[total_read..]) {
+                Ok(0) => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "Connection closed",
+                    ));
+                }
+                Ok(n) => {
+                    total_read += n;
+                    retries = 0; // Reset retries on successful read
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    retries += 1;
+                    if retries > max_retries {
+                        return Err(e);
+                    }
+                    // Wait a bit before retrying
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                    // Retry immediately on interrupt
+                    continue;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
     }
 
     /// Send request to daemon and receive response
@@ -213,16 +257,15 @@ impl PythonBridge {
             .flush()
             .map_err(|e| Error::InferenceError(format!("Failed to flush: {}", e)))?;
 
-        // Read length-prefixed response
+        // Read length-prefixed response with retry logic for EAGAIN
+        // Allow up to 3000 retries (5 minutes at 100ms per retry)
         let mut length_buf = [0u8; 4];
-        stream
-            .read_exact(&mut length_buf)
+        Self::read_exact_with_retry(stream, &mut length_buf, 3000)
             .map_err(|e| Error::InferenceError(format!("Failed to read response length: {}", e)))?;
         let response_len = u32::from_be_bytes(length_buf) as usize;
 
         let mut response_buf = vec![0u8; response_len];
-        stream
-            .read_exact(&mut response_buf)
+        Self::read_exact_with_retry(stream, &mut response_buf, 3000)
             .map_err(|e| Error::InferenceError(format!("Failed to read response body: {}", e)))?;
 
         let response: PythonTTSResponse = serde_json::from_slice(&response_buf).map_err(|e| {
@@ -386,8 +429,14 @@ impl PythonBridge {
         ref_text: Option<String>,
     ) -> Result<(Vec<f32>, u32)> {
         info!("Generating TTS for text: {}", text);
+        info!(
+            "Voice clone params - ref_audio: {}, ref_text: {}",
+            ref_audio_base64.is_some(),
+            ref_text.is_some()
+        );
 
         let use_voice_clone = ref_audio_base64.is_some() && ref_text.is_some();
+        info!("use_voice_clone: {}", use_voice_clone);
 
         let request = PythonTTSRequest {
             command: "generate".to_string(),

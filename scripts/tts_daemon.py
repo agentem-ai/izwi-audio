@@ -232,16 +232,31 @@ class TTSDaemon:
         ref_text = request.get("ref_text")
         use_voice_clone = request.get("use_voice_clone", False)
 
+        # Debug logging
+        print(f"[Daemon] Generate request - model_path: {model_path}", file=sys.stderr)
+        print(
+            f"[Daemon] use_voice_clone: {use_voice_clone}, has_ref_audio: {ref_audio_b64 is not None}, has_ref_text: {ref_text is not None}",
+            file=sys.stderr,
+        )
+        if ref_text:
+            print(f"[Daemon] ref_text: {ref_text[:50]}...", file=sys.stderr)
+
         model_id = self._get_hf_model_id(model_path)
+        print(f"[Daemon] Resolved model_id: {model_id}", file=sys.stderr)
 
         try:
             model = self._load_model(model_id)
         except Exception as e:
             return {"error": f"Failed to load model {model_id}: {str(e)}"}
 
+        print(
+            f"[Daemon] Checking voice clone condition: use_voice_clone={use_voice_clone}, has_audio={ref_audio_b64 is not None and len(ref_audio_b64) > 0 if ref_audio_b64 else False}, has_text={ref_text is not None and len(ref_text) > 0 if ref_text else False}",
+            file=sys.stderr,
+        )
+
         try:
-            # Voice cloning with Base models
-            if use_voice_clone and "Base" in model_id and ref_audio_b64 and ref_text:
+            # Voice cloning - works with Base and CustomVoice models
+            if use_voice_clone and ref_audio_b64 and ref_text:
                 ref_audio_array, ref_sr = self._decode_reference_audio(ref_audio_b64)
                 if ref_audio_array is None:
                     return {
@@ -255,6 +270,7 @@ class TTSDaemon:
                     ref_text=ref_text,
                 )
             elif "CustomVoice" in model_id:
+                # CustomVoice without voice cloning - use speaker presets
                 wavs, sr = model.generate_custom_voice(
                     text=text,
                     language=language,
@@ -267,10 +283,13 @@ class TTSDaemon:
                     language=language,
                     instruct=instruct if instruct else "Natural speaking voice.",
                 )
-            else:
+            elif "Base" in model_id:
+                # Base models require voice cloning
                 return {
-                    "error": "Base models require voice cloning. Please provide reference audio and transcript."
+                    "error": "Base models require voice cloning. Please provide reference_audio and reference_text, or load a CustomVoice model to use speaker presets like 'Vivian'."
                 }
+            else:
+                return {"error": f"Unknown model type: {model_id}"}
         except Exception as e:
             return {"error": f"Generation failed: {str(e)}"}
 

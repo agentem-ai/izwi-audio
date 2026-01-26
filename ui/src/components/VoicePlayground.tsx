@@ -77,7 +77,16 @@ export function VoicePlayground({
         setAudioUrl(null);
       }
 
-      const blob = await api.generateTTS({
+      console.log(
+        "[VoicePlayground] Generating TTS - useVoiceClone:",
+        useVoiceClone,
+        "hasAudio:",
+        !!voiceCloneAudio,
+        "hasTranscript:",
+        !!voiceCloneTranscript,
+      );
+
+      const request = {
         text: text.trim(),
         speaker: useVoiceClone ? undefined : speaker,
         reference_audio: useVoiceClone
@@ -86,7 +95,16 @@ export function VoicePlayground({
         reference_text: useVoiceClone
           ? voiceCloneTranscript || undefined
           : undefined,
+      };
+
+      console.log("[VoicePlayground] API request:", {
+        ...request,
+        reference_audio: request.reference_audio
+          ? `[${request.reference_audio.length} chars]`
+          : undefined,
       });
+
+      const blob = await api.generateTTS(request);
 
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
@@ -236,11 +254,18 @@ export function VoicePlayground({
             </div>
             <VoiceClone
               onVoiceCloneReady={(audio, transcript) => {
+                console.log(
+                  "[VoicePlayground] Voice clone ready - audio length:",
+                  audio?.length,
+                  "transcript:",
+                  transcript,
+                );
                 setVoiceCloneAudio(audio);
                 setVoiceCloneTranscript(transcript);
                 setUseVoiceClone(true);
               }}
               onClear={() => {
+                console.log("[VoicePlayground] Voice clone cleared");
                 setVoiceCloneAudio(null);
                 setVoiceCloneTranscript(null);
                 setUseVoiceClone(false);

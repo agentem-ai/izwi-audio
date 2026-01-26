@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Mic, Square, Play, Check, X } from "lucide-react";
 import clsx from "clsx";
@@ -15,11 +15,88 @@ export function VoiceClone({ onVoiceCloneReady, onClear }: VoiceCloneProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const isConfirmingRef = useRef(false);
+
+  // Auto-confirm voice cloning when both audio and transcript are available
+  const autoConfirm = useCallback(() => {
+    if (
+      !audioBlob ||
+      !transcript.trim() ||
+      isConfirmed ||
+      isConfirmingRef.current
+    ) {
+      return;
+    }
+
+    isConfirmingRef.current = true;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      const base64Audio = base64.split(",")[1];
+      if (base64Audio) {
+        console.log(
+          "[VoiceClone] Auto-confirming voice clone - audio length:",
+          base64Audio.length,
+          "transcript:",
+          transcript.trim(),
+        );
+        onVoiceCloneReady(base64Audio, transcript.trim());
+        setIsConfirmed(true);
+      }
+      isConfirmingRef.current = false;
+    };
+    reader.onerror = () => {
+      console.error("[VoiceClone] Auto-confirm FileReader error");
+      isConfirmingRef.current = false;
+    };
+    reader.readAsDataURL(audioBlob);
+  }, [audioBlob, transcript, isConfirmed, onVoiceCloneReady]);
+
+  // Trigger auto-confirm when audio becomes available (transcript already exists)
+  // or when transcript is entered (audio already exists)
+  useEffect(() => {
+    if (audioBlob && transcript.trim()) {
+      if (!isConfirmed) {
+        // Initial auto-confirm with delay to debounce rapid transcript changes
+        const timer = setTimeout(autoConfirm, 300);
+        return () => clearTimeout(timer);
+      } else {
+        // Already confirmed - update parent with new transcript (debounced)
+        const timer = setTimeout(() => {
+          if (!isConfirmingRef.current) {
+            isConfirmingRef.current = true;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64 = reader.result as string;
+              const base64Audio = base64.split(",")[1];
+              if (base64Audio) {
+                console.log(
+                  "[VoiceClone] Updating transcript - audio length:",
+                  base64Audio.length,
+                  "transcript:",
+                  transcript.trim(),
+                );
+                onVoiceCloneReady(base64Audio, transcript.trim());
+              }
+              isConfirmingRef.current = false;
+            };
+            reader.onerror = () => {
+              isConfirmingRef.current = false;
+            };
+            reader.readAsDataURL(audioBlob);
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [audioBlob, transcript, isConfirmed, autoConfirm, onVoiceCloneReady]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -119,6 +196,7 @@ export function VoiceClone({ onVoiceCloneReady, onClear }: VoiceCloneProps) {
     setTranscript("");
     setMode(null);
     setError(null);
+    setIsConfirmed(false);
     onClear();
   };
 
@@ -135,7 +213,18 @@ export function VoiceClone({ onVoiceCloneReady, onClear }: VoiceCloneProps) {
         const base64 = reader.result as string;
         // Remove data URL prefix
         const base64Audio = base64.split(",")[1];
+        console.log(
+          "[VoiceClone] Calling onVoiceCloneReady with audio length:",
+          base64Audio?.length,
+          "transcript:",
+          transcript.trim(),
+        );
         onVoiceCloneReady(base64Audio, transcript.trim());
+        setIsConfirmed(true);
+      };
+      reader.onerror = () => {
+        setError("Failed to read audio file");
+        console.error("[VoiceClone] FileReader error");
       };
       reader.readAsDataURL(audioBlob);
     } catch (err) {
@@ -248,14 +337,21 @@ export function VoiceClone({ onVoiceCloneReady, onClear }: VoiceCloneProps) {
 
           {/* Action buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleConfirm}
-              disabled={!transcript.trim()}
-              className="btn btn-primary flex-1 text-sm"
-            >
-              <Check className="w-4 h-4" />
-              Use This Voice
-            </button>
+            {isConfirmed ? (
+              <div className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded bg-green-950/50 border border-green-800/50 text-green-400 text-sm">
+                <Check className="w-4 h-4" />
+                Voice Ready
+              </div>
+            ) : (
+              <button
+                onClick={handleConfirm}
+                disabled={!transcript.trim()}
+                className="btn btn-primary flex-1 text-sm"
+              >
+                <Check className="w-4 h-4" />
+                Use This Voice
+              </button>
+            )}
             <button onClick={handleClear} className="btn btn-ghost text-sm">
               <X className="w-3.5 h-3.5" />
               Clear
