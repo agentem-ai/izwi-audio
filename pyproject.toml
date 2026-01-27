@@ -25,6 +25,8 @@ dependencies = [
     "numpy>=1.24.0,<2.0",
     "pydub>=0.25.0",
     "transformers==4.57.3",
+    "liquid-audio>=0.1.0",
+    "torchaudio>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +35,7 @@ cuda = ["flash-attn>=2.5.0"]
 
 [project.scripts]
 izwi-tts-daemon = "scripts.tts_daemon:main"
+izwi-lfm2-daemon = "scripts.lfm2_daemon:main"
 
 [project.urls]
 Homepage = "https://github.com/agentem/izwi-audio"

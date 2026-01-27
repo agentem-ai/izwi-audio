@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, X, Github, Waves, ChevronRight } from "lucide-react";
 import { ModelManager } from "./components/ModelManager";
 import { ViewSwitcher } from "./components/ViewSwitcher";
-import { CustomVoicePlayground } from "./components/CustomVoicePlayground";
+import { TTSPlaygroundWrapper } from "./components/TTSPlaygroundWrapper";
 import { VoiceClonePlayground } from "./components/VoiceClonePlayground";
 import { VoiceDesignPlayground } from "./components/VoiceDesignPlayground";
+import { LFM2AudioPlayground } from "./components/LFM2AudioPlayground";
 import { api, ModelInfo } from "./api";
 import { ViewMode, VIEW_CONFIGS } from "./types";
 
@@ -152,6 +153,7 @@ function App() {
       "custom-voice": { total: 0, ready: 0 },
       "voice-clone": { total: 0, ready: 0 },
       "voice-design": { total: 0, ready: 0 },
+      "lfm2-audio": { total: 1, ready: 1 },
     };
 
     models
@@ -336,7 +338,7 @@ function App() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <CustomVoicePlayground
+                  <TTSPlaygroundWrapper
                     selectedModel={relevantSelectedModel}
                     onModelRequired={() =>
                       setError("Please load a CustomVoice model first")
@@ -376,6 +378,18 @@ function App() {
                       setError("Please load the VoiceDesign model first")
                     }
                   />
+                </motion.div>
+              )}
+
+              {currentView === "lfm2-audio" && (
+                <motion.div
+                  key="lfm2-audio"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <LFM2AudioPlayground />
                 </motion.div>
               )}
             </AnimatePresence>

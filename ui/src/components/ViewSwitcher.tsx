@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Volume2, Users, Wand2 } from "lucide-react";
+import { Volume2, Users, Wand2, AudioWaveform } from "lucide-react";
 import { ViewMode, VIEW_CONFIGS } from "../types";
 import clsx from "clsx";
 
@@ -13,6 +13,7 @@ const ICONS = {
   Volume2,
   Users,
   Wand2,
+  AudioWaveform,
 };
 
 export function ViewSwitcher({

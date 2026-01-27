@@ -1,4 +1,8 @@
-export type ViewMode = "custom-voice" | "voice-clone" | "voice-design";
+export type ViewMode =
+  | "custom-voice"
+  | "voice-clone"
+  | "voice-design"
+  | "lfm2-audio";
 
 export interface ViewConfig {
   id: ViewMode;
@@ -41,6 +45,16 @@ export const VIEW_CONFIGS: Record<ViewMode, ViewConfig> = {
     emptyStateTitle: "No Voice Design Model Loaded",
     emptyStateDescription:
       "Load the VoiceDesign model to create voices from descriptions",
+  },
+  "lfm2-audio": {
+    id: "lfm2-audio",
+    label: "Audio",
+    description: "Audio-to-audio chat with LFM2-Audio",
+    icon: "AudioWaveform",
+    modelFilter: (variant) => variant.includes("LFM2-Audio"),
+    emptyStateTitle: "LFM2-Audio Ready",
+    emptyStateDescription:
+      "Start a conversation with audio input and get audio responses",
   },
 };
 
@@ -127,6 +141,29 @@ export const SAMPLE_TEXTS = {
     "人工智能正在改变我们的生活方式。",
   ],
 };
+
+export const LFM2_VOICES = [
+  {
+    id: "us_male",
+    name: "US Male",
+    description: "American English male voice",
+  },
+  {
+    id: "us_female",
+    name: "US Female",
+    description: "American English female voice",
+  },
+  {
+    id: "uk_male",
+    name: "UK Male",
+    description: "British English male voice",
+  },
+  {
+    id: "uk_female",
+    name: "UK Female",
+    description: "British English female voice",
+  },
+];
 
 export const VOICE_DESIGN_PRESETS = [
   {

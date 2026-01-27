@@ -2,6 +2,7 @@
 
 mod daemon;
 mod health;
+mod lfm2;
 mod models;
 mod tts;
 
@@ -30,9 +31,14 @@ pub fn create_router(state: AppState) -> Router {
         .route("/models/:variant/load", post(models::load_model))
         .route("/models/:variant/unload", post(models::unload_model))
         .route("/models/:variant", get(models::get_model_info))
-        // TTS generation
+        // TTS generation (Qwen3-TTS)
         .route("/tts/generate", post(tts::generate))
-        .route("/tts/stream", post(tts::generate_stream));
+        .route("/tts/stream", post(tts::generate_stream))
+        // LFM2-Audio endpoints
+        .route("/lfm2/status", get(lfm2::status))
+        .route("/lfm2/tts", post(lfm2::tts))
+        .route("/lfm2/asr", post(lfm2::asr))
+        .route("/lfm2/chat", post(lfm2::chat));
 
     Router::new()
         .nest("/api/v1", api_routes)
