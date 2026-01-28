@@ -1,0 +1,429 @@
+//! Request types and processing for the inference engine.
+
+use serde::{Deserialize, Serialize};
+use std::time::Instant;
+use tokio::sync::mpsc;
+use uuid::Uuid;
+
+use super::config::EngineCoreConfig;
+use super::output::StreamingOutput;
+use super::types::{GenerationParams, ModelType, Priority, RequestId, TaskType, TokenId};
+use crate::error::{Error, Result};
+
+/// Status of a request in the engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RequestStatus {
+    /// Request is waiting to be scheduled
+    Waiting,
+    /// Request is currently being processed
+    Running,
+    /// Request has completed successfully
+    Finished,
+    /// Request was aborted
+    Aborted,
+    /// Request failed with an error
+    Failed,
+}
+
+/// A request to the engine core.
+#[derive(Debug, Clone)]
+pub struct EngineCoreRequest {
+    /// Unique request ID
+    pub id: RequestId,
+    /// Task type (TTS, ASR, AudioChat)
+    pub task_type: TaskType,
+    /// Model type to use
+    pub model_type: ModelType,
+    /// Input text (for TTS)
+    pub text: Option<String>,
+    /// Input audio (base64 encoded, for ASR/chat)
+    pub audio_input: Option<String>,
+    /// Reference audio for voice cloning (base64 encoded)
+    pub reference_audio: Option<String>,
+    /// Reference text for voice cloning
+    pub reference_text: Option<String>,
+    /// Voice description for voice design
+    pub voice_description: Option<String>,
+    /// Generation parameters
+    pub params: GenerationParams,
+    /// Request priority
+    pub priority: Priority,
+    /// Arrival timestamp
+    pub arrival_time: Instant,
+    /// Prompt token IDs (set by processor)
+    pub prompt_tokens: Vec<TokenId>,
+    /// Enable streaming output
+    pub streaming: bool,
+    /// Channel for streaming output (internal use)
+    #[allow(dead_code)]
+    pub(crate) streaming_tx: Option<mpsc::Sender<StreamingOutput>>,
+}
+
+impl EngineCoreRequest {
+    /// Create a new TTS request.
+    pub fn tts(text: impl Into<String>) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            task_type: TaskType::TTS,
+            model_type: ModelType::LFM2Audio,
+            text: Some(text.into()),
+            audio_input: None,
+            reference_audio: None,
+            reference_text: None,
+            voice_description: None,
+            params: GenerationParams::default(),
+            priority: Priority::Normal,
+            arrival_time: Instant::now(),
+            prompt_tokens: Vec::new(),
+            streaming: false,
+            streaming_tx: None,
+        }
+    }
+
+    /// Create a new ASR request.
+    pub fn asr(audio_base64: impl Into<String>) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            task_type: TaskType::ASR,
+            model_type: ModelType::LFM2Audio,
+            text: None,
+            audio_input: Some(audio_base64.into()),
+            reference_audio: None,
+            reference_text: None,
+            voice_description: None,
+            params: GenerationParams::default(),
+            priority: Priority::Normal,
+            arrival_time: Instant::now(),
+            prompt_tokens: Vec::new(),
+            streaming: false,
+            streaming_tx: None,
+        }
+    }
+
+    /// Create a new audio chat request.
+    pub fn audio_chat(audio_base64: Option<String>, text: Option<String>) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            task_type: TaskType::AudioChat,
+            model_type: ModelType::LFM2Audio,
+            text,
+            audio_input: audio_base64,
+            reference_audio: None,
+            reference_text: None,
+            voice_description: None,
+            params: GenerationParams::default(),
+            priority: Priority::Normal,
+            arrival_time: Instant::now(),
+            prompt_tokens: Vec::new(),
+            streaming: false,
+            streaming_tx: None,
+        }
+    }
+
+    /// Set model type.
+    pub fn with_model_type(mut self, model_type: ModelType) -> Self {
+        self.model_type = model_type;
+        self
+    }
+
+    /// Set generation parameters.
+    pub fn with_params(mut self, params: GenerationParams) -> Self {
+        self.params = params;
+        self
+    }
+
+    /// Set priority.
+    pub fn with_priority(mut self, priority: Priority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    /// Enable streaming.
+    pub fn with_streaming(mut self, streaming: bool) -> Self {
+        self.streaming = streaming;
+        self
+    }
+
+    /// Set voice/speaker.
+    pub fn with_voice(mut self, voice: impl Into<String>) -> Self {
+        self.params.voice = Some(voice.into());
+        self
+    }
+
+    /// Set reference audio for voice cloning.
+    pub fn with_reference(mut self, audio: impl Into<String>, text: impl Into<String>) -> Self {
+        self.reference_audio = Some(audio.into());
+        self.reference_text = Some(text.into());
+        self
+    }
+
+    /// Set voice description.
+    pub fn with_voice_description(mut self, description: impl Into<String>) -> Self {
+        self.voice_description = Some(description.into());
+        self
+    }
+
+    /// Get number of prompt tokens.
+    pub fn num_prompt_tokens(&self) -> usize {
+        if !self.prompt_tokens.is_empty() {
+            self.prompt_tokens.len()
+        } else {
+            // Estimate from text length (rough approximation)
+            self.text.as_ref().map(|t| t.len() / 4).unwrap_or(0).max(1)
+        }
+    }
+
+    /// Time since request arrival.
+    pub fn waiting_time(&self) -> std::time::Duration {
+        self.arrival_time.elapsed()
+    }
+}
+
+/// Request processor - validates and preprocesses requests.
+pub struct RequestProcessor {
+    config: EngineCoreConfig,
+}
+
+impl RequestProcessor {
+    /// Create a new request processor.
+    pub fn new(config: EngineCoreConfig) -> Self {
+        Self { config }
+    }
+
+    /// Process and validate a request.
+    pub fn process(&self, mut request: EngineCoreRequest) -> Result<EngineCoreRequest> {
+        // Validate request based on task type
+        match request.task_type {
+            TaskType::TTS => {
+                if request.text.is_none()
+                    || request.text.as_ref().map(|t| t.is_empty()).unwrap_or(true)
+                {
+                    return Err(Error::InvalidInput("TTS request requires text".into()));
+                }
+            }
+            TaskType::ASR => {
+                if request.audio_input.is_none() {
+                    return Err(Error::InvalidInput(
+                        "ASR request requires audio input".into(),
+                    ));
+                }
+            }
+            TaskType::AudioChat => {
+                if request.audio_input.is_none() && request.text.is_none() {
+                    return Err(Error::InvalidInput(
+                        "Audio chat request requires audio or text input".into(),
+                    ));
+                }
+            }
+        }
+
+        // Validate and clamp parameters
+        self.validate_params(&mut request.params)?;
+
+        // Set model type from config if not specified
+        if request.model_type == ModelType::default() {
+            request.model_type = self.config.model_type;
+        }
+
+        // Tokenize text input (simplified - actual tokenization would be more complex)
+        if let Some(text) = &request.text {
+            // For now, use a simple approximation. In production, this would use
+            // the actual tokenizer for the model.
+            let estimated_tokens = (text.len() / 4).max(1);
+            request.prompt_tokens = (0..estimated_tokens as u32).collect();
+        }
+
+        Ok(request)
+    }
+
+    /// Validate and clamp generation parameters.
+    fn validate_params(&self, params: &mut GenerationParams) -> Result<()> {
+        // Clamp temperature
+        params.temperature = params.temperature.clamp(0.0, 2.0);
+
+        // Clamp top_p
+        params.top_p = params.top_p.clamp(0.0, 1.0);
+
+        // Clamp max_tokens
+        if params.max_tokens == 0 {
+            params.max_tokens = 2048;
+        }
+        params.max_tokens = params.max_tokens.min(self.config.max_seq_len);
+
+        // Clamp speed
+        params.speed = params.speed.clamp(0.5, 2.0);
+
+        // Validate repetition penalty
+        if params.repetition_penalty < 1.0 {
+            params.repetition_penalty = 1.0;
+        }
+
+        Ok(())
+    }
+}
+
+/// Builder for creating requests with a fluent API.
+pub struct RequestBuilder {
+    request: EngineCoreRequest,
+}
+
+impl RequestBuilder {
+    /// Create a new TTS request builder.
+    pub fn tts(text: impl Into<String>) -> Self {
+        Self {
+            request: EngineCoreRequest::tts(text),
+        }
+    }
+
+    /// Create a new ASR request builder.
+    pub fn asr(audio_base64: impl Into<String>) -> Self {
+        Self {
+            request: EngineCoreRequest::asr(audio_base64),
+        }
+    }
+
+    /// Create a new audio chat request builder.
+    pub fn audio_chat() -> Self {
+        Self {
+            request: EngineCoreRequest::audio_chat(None, None),
+        }
+    }
+
+    /// Set the request ID.
+    pub fn id(mut self, id: impl Into<String>) -> Self {
+        self.request.id = id.into();
+        self
+    }
+
+    /// Set the model type.
+    pub fn model(mut self, model_type: ModelType) -> Self {
+        self.request.model_type = model_type;
+        self
+    }
+
+    /// Set the voice.
+    pub fn voice(mut self, voice: impl Into<String>) -> Self {
+        self.request.params.voice = Some(voice.into());
+        self
+    }
+
+    /// Set the speaker (alias for voice).
+    pub fn speaker(mut self, speaker: impl Into<String>) -> Self {
+        self.request.params.speaker = Some(speaker.into());
+        self
+    }
+
+    /// Set reference audio and text for voice cloning.
+    pub fn reference(mut self, audio: impl Into<String>, text: impl Into<String>) -> Self {
+        self.request.reference_audio = Some(audio.into());
+        self.request.reference_text = Some(text.into());
+        self
+    }
+
+    /// Set voice description.
+    pub fn voice_description(mut self, description: impl Into<String>) -> Self {
+        self.request.voice_description = Some(description.into());
+        self
+    }
+
+    /// Set temperature.
+    pub fn temperature(mut self, temp: f32) -> Self {
+        self.request.params.temperature = temp;
+        self
+    }
+
+    /// Set top_p.
+    pub fn top_p(mut self, p: f32) -> Self {
+        self.request.params.top_p = p;
+        self
+    }
+
+    /// Set top_k.
+    pub fn top_k(mut self, k: usize) -> Self {
+        self.request.params.top_k = k;
+        self
+    }
+
+    /// Set max tokens.
+    pub fn max_tokens(mut self, max: usize) -> Self {
+        self.request.params.max_tokens = max;
+        self
+    }
+
+    /// Set audio temperature.
+    pub fn audio_temperature(mut self, temp: f32) -> Self {
+        self.request.params.audio_temperature = Some(temp);
+        self
+    }
+
+    /// Set audio top_k.
+    pub fn audio_top_k(mut self, k: usize) -> Self {
+        self.request.params.audio_top_k = Some(k);
+        self
+    }
+
+    /// Set priority.
+    pub fn priority(mut self, priority: Priority) -> Self {
+        self.request.priority = priority;
+        self
+    }
+
+    /// Enable streaming.
+    pub fn streaming(mut self) -> Self {
+        self.request.streaming = true;
+        self
+    }
+
+    /// Set audio input (for ASR/chat).
+    pub fn audio_input(mut self, audio: impl Into<String>) -> Self {
+        self.request.audio_input = Some(audio.into());
+        self
+    }
+
+    /// Set text input (for chat).
+    pub fn text_input(mut self, text: impl Into<String>) -> Self {
+        self.request.text = Some(text.into());
+        self
+    }
+
+    /// Build the request.
+    pub fn build(self) -> EngineCoreRequest {
+        self.request
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tts_request() {
+        let request = EngineCoreRequest::tts("Hello, world!");
+        assert_eq!(request.task_type, TaskType::TTS);
+        assert_eq!(request.text.as_deref(), Some("Hello, world!"));
+    }
+
+    #[test]
+    fn test_request_builder() {
+        let request = RequestBuilder::tts("Hello")
+            .voice("us_female")
+            .temperature(0.8)
+            .max_tokens(1024)
+            .streaming()
+            .build();
+
+        assert!(request.streaming);
+        assert_eq!(request.params.temperature, 0.8);
+        assert_eq!(request.params.max_tokens, 1024);
+    }
+
+    #[test]
+    fn test_request_processor() {
+        let config = EngineCoreConfig::default();
+        let processor = RequestProcessor::new(config);
+
+        let request = EngineCoreRequest::tts("Test");
+        let processed = processor.process(request);
+        assert!(processed.is_ok());
+    }
+}

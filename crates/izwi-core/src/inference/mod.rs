@@ -3,8 +3,8 @@
 mod engine;
 mod generation;
 mod kv_cache;
-mod lfm2_bridge;
-mod python_bridge;
+pub mod lfm2_bridge;
+pub mod python_bridge;
 
 pub use engine::InferenceEngine;
 pub use generation::{AudioChunk, GenerationConfig, GenerationRequest};
