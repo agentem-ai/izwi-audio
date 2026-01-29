@@ -7,6 +7,7 @@ use tracing::{info, warn};
 use crate::audio::{AudioChunkBuffer, AudioCodec, AudioEncoder, StreamingConfig};
 use crate::config::EngineConfig;
 use crate::error::{Error, Result};
+use crate::inference::asr_bridge::{AsrBridge, AsrResponse};
 use crate::inference::generation::{
     AudioChunk, GenerationConfig, GenerationRequest, GenerationResult,
 };
@@ -26,6 +27,7 @@ pub struct InferenceEngine {
     streaming_config: StreamingConfig,
     python_bridge: PythonBridge,
     lfm2_bridge: LFM2Bridge,
+    asr_bridge: AsrBridge,
     loaded_model_path: Option<std::path::PathBuf>,
 }
 
@@ -45,6 +47,7 @@ impl InferenceEngine {
             streaming_config: StreamingConfig::default(),
             python_bridge: PythonBridge::new(),
             lfm2_bridge: LFM2Bridge::new(),
+            asr_bridge: AsrBridge::new(),
             loaded_model_path: None,
         })
     }
@@ -393,6 +396,41 @@ impl InferenceEngine {
             audio_temperature,
             audio_top_k,
         )
+    }
+
+    // ============ Qwen3-ASR Methods ============
+
+    /// Ensure the ASR daemon is running
+    pub fn ensure_asr_daemon_running(&self) -> Result<()> {
+        self.asr_bridge.ensure_daemon_running()
+    }
+
+    /// Stop the ASR daemon
+    pub fn stop_asr_daemon(&self) -> Result<()> {
+        self.asr_bridge.stop_daemon()
+    }
+
+    /// Get ASR daemon status
+    pub fn get_asr_daemon_status(&self) -> Result<AsrResponse> {
+        self.asr_bridge.get_status()
+    }
+
+    /// Transcribe audio with Qwen3-ASR
+    pub fn asr_transcribe(
+        &self,
+        audio_base64: &str,
+        model_id: Option<&str>,
+        language: Option<&str>,
+    ) -> Result<AsrResponse> {
+        self.asr_bridge.transcribe(audio_base64, model_id, language)
+    }
+
+    /// Stop all daemons (TTS, LFM2, ASR)
+    pub fn stop_all_daemons(&self) -> Result<()> {
+        let _ = self.stop_daemon();
+        let _ = self.stop_lfm2_daemon();
+        let _ = self.stop_asr_daemon();
+        Ok(())
     }
 }
 

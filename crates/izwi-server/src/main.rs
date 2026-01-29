@@ -1,14 +1,15 @@
 //! Izwi TTS Server - HTTP API for Qwen3-TTS inference
 
-use tracing::info;
+use tokio::signal;
+use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod api;
-mod state;
 mod error;
+mod state;
 
-use state::AppState;
 use izwi_core::{EngineConfig, InferenceEngine};
+use state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -31,15 +32,87 @@ async fn main() -> anyhow::Result<()> {
     let engine = InferenceEngine::new(config)?;
     let state = AppState::new(engine);
 
+    // Start all daemons on server startup
+    info!("Starting daemons...");
+    let engine_ref = state.engine.read().await;
+
+    // Start TTS daemon
+    if let Err(e) = engine_ref.ensure_daemon_running() {
+        warn!("Failed to start TTS daemon: {}. Will start on-demand.", e);
+    } else {
+        info!("TTS daemon started");
+    }
+
+    // Start LFM2 daemon
+    if let Err(e) = engine_ref.ensure_lfm2_daemon_running() {
+        warn!("Failed to start LFM2 daemon: {}. Will start on-demand.", e);
+    } else {
+        info!("LFM2 daemon started");
+    }
+
+    // Start ASR daemon
+    if let Err(e) = engine_ref.ensure_asr_daemon_running() {
+        warn!("Failed to start ASR daemon: {}. Will start on-demand.", e);
+    } else {
+        info!("ASR daemon started");
+    }
+
+    drop(engine_ref);
+
     // Build router
-    let app = api::create_router(state);
+    let app = api::create_router(state.clone());
 
     // Start server
     let addr = "0.0.0.0:8080";
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("Server listening on http://{}", addr);
 
-    axum::serve(listener, app).await?;
+    // Clone state for shutdown handler
+    let shutdown_state = state.clone();
+
+    // Spawn server with graceful shutdown
+    let server = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal(shutdown_state));
+
+    info!("Server ready. Press Ctrl+C to stop.");
+    server.await?;
 
     Ok(())
+}
+
+/// Wait for shutdown signal and cleanup
+async fn shutdown_signal(state: AppState) {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Received Ctrl+C, shutting down...");
+        },
+        _ = terminate => {
+            info!("Received SIGTERM, shutting down...");
+        },
+    }
+
+    // Cleanup: stop all daemons
+    info!("Stopping all daemons...");
+    let engine = state.engine.read().await;
+    if let Err(e) = engine.stop_all_daemons() {
+        warn!("Error stopping daemons: {}", e);
+    } else {
+        info!("All daemons stopped");
+    }
 }
