@@ -455,7 +455,7 @@ export function MyModelsPage({
           </p>
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           {filteredModels.map((model) => {
             const details = MODEL_DETAILS[model.variant];
             if (!details) return null;
@@ -470,32 +470,32 @@ export function MyModelsPage({
             return (
               <div
                 key={model.variant}
-                className="p-4 rounded-lg bg-[#161616] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors"
+                className="p-3 rounded-lg bg-[#161616] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors"
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-center gap-3">
                   {/* Status indicator */}
-                  <div className="flex-shrink-0 pt-1">
+                  <div className="flex-shrink-0">
                     {isDownloading || isLoading ? (
-                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
                     ) : (
                       <div
                         className={clsx(
-                          "w-2.5 h-2.5 rounded-full",
+                          "w-2 h-2 rounded-full",
                           getStatusColor(model.status),
                         )}
                       />
                     )}
                   </div>
 
-                  {/* Model info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-medium text-white">
+                  {/* Model info - more horizontal layout */}
+                  <div className="flex-1 min-w-0 flex items-center gap-4">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h3 className="text-sm font-medium text-white truncate">
                         {details.shortName}
                       </h3>
                       <span
                         className={clsx(
-                          "text-[10px] px-1.5 py-0.5 rounded",
+                          "text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap",
                           isReady
                             ? "bg-green-500/20 text-green-400"
                             : isDownloaded
@@ -506,42 +506,24 @@ export function MyModelsPage({
                         {getStatusLabel(model.status)}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 mb-2">
+                    <p className="text-xs text-gray-500 truncate hidden sm:block">
                       {details.description}
                     </p>
-
-                    {/* Capabilities */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 ml-auto">
                       <div className="flex items-center gap-1.5">
                         {details.capabilities.map((cap) => (
                           <span
                             key={cap}
-                            className="text-[10px] px-2 py-0.5 rounded bg-[#1f1f1f] text-gray-400"
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-[#1f1f1f] text-gray-400 whitespace-nowrap"
                           >
                             {cap}
                           </span>
                         ))}
                       </div>
-                      <span className="text-xs text-gray-600">
+                      <span className="text-xs text-gray-600 whitespace-nowrap">
                         {details.size}
                       </span>
                     </div>
-
-                    {/* Download progress */}
-                    {isDownloading && (
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                          <span>Downloading...</span>
-                          <span>{Math.round(progress)}%</span>
-                        </div>
-                        <div className="h-1 bg-[#1f1f1f] rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-white rounded-full transition-all duration-300"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Actions */}
@@ -549,33 +531,49 @@ export function MyModelsPage({
                     {model.status === "not_downloaded" && (
                       <button
                         onClick={() => onDownload(model.variant)}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded bg-white text-black text-xs font-medium hover:bg-gray-200 transition-colors"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-white text-black text-xs font-medium hover:bg-gray-200 transition-colors"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        Download
+                        <span className="hidden sm:inline">Download</span>
                       </button>
+                    )}
+
+                    {isDownloading && (
+                      <div className="flex items-center gap-2 px-2.5 py-1.5">
+                        <span className="text-xs text-gray-500">
+                          {Math.round(progress)}%
+                        </span>
+                        <div className="w-16 h-1 bg-[#1f1f1f] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-white rounded-full transition-all duration-300"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
                     )}
 
                     {isDownloaded && (
                       <>
                         <button
                           onClick={() => onLoad(model.variant)}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded bg-white text-black text-xs font-medium hover:bg-gray-200 transition-colors"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-white text-black text-xs font-medium hover:bg-gray-200 transition-colors"
                         >
                           <Play className="w-3.5 h-3.5" />
-                          Load
+                          <span className="hidden sm:inline">Load</span>
                         </button>
                         {confirmDelete === model.variant ? (
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => handleDelete(model.variant)}
                               className="p-1.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+                              title="Confirm delete"
                             >
                               <Check className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => setConfirmDelete(null)}
                               className="p-1.5 rounded bg-[#2a2a2a] text-gray-400 hover:text-white transition-colors"
+                              title="Cancel"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -584,8 +582,9 @@ export function MyModelsPage({
                           <button
                             onClick={() => setConfirmDelete(model.variant)}
                             className="p-1.5 rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Delete model"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </>
@@ -595,22 +594,24 @@ export function MyModelsPage({
                       <>
                         <button
                           onClick={() => onUnload(model.variant)}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#1f1f1f] border border-[#2a2a2a] text-white text-xs font-medium hover:bg-[#2a2a2a] transition-colors"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-[#1f1f1f] border border-[#2a2a2a] text-white text-xs font-medium hover:bg-[#2a2a2a] transition-colors"
                         >
                           <Square className="w-3.5 h-3.5" />
-                          Unload
+                          <span className="hidden sm:inline">Unload</span>
                         </button>
                         {confirmDelete === model.variant ? (
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => handleDelete(model.variant)}
                               className="p-1.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+                              title="Confirm delete"
                             >
                               <Check className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => setConfirmDelete(null)}
                               className="p-1.5 rounded bg-[#2a2a2a] text-gray-400 hover:text-white transition-colors"
+                              title="Cancel"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -619,8 +620,9 @@ export function MyModelsPage({
                           <button
                             onClick={() => setConfirmDelete(model.variant)}
                             className="p-1.5 rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Delete model"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </>

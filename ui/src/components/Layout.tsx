@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Volume2,
+  Mic,
   Users,
   Wand2,
   FileText,
@@ -31,8 +31,8 @@ const NAV_ITEMS: NavItem[] = [
   {
     id: "text-to-speech",
     label: "Text to Speech",
-    description: "Generate speech with built-in voices",
-    icon: Volume2,
+    description: "Generate speech from text",
+    icon: Mic,
     path: "/text-to-speech",
   },
   {
@@ -56,6 +56,9 @@ const NAV_ITEMS: NavItem[] = [
     icon: FileText,
     path: "/transcription",
   },
+];
+
+const BOTTOM_NAV_ITEMS: NavItem[] = [
   {
     id: "my-models",
     label: "My Models",
@@ -65,7 +68,11 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export function Layout({ error, onErrorDismiss, readyModelsCount }: LayoutProps) {
+export function Layout({
+  error,
+  onErrorDismiss,
+  readyModelsCount,
+}: LayoutProps) {
   return (
     <div className="min-h-screen flex bg-[#0d0d0d]">
       {/* Sidebar */}
@@ -84,49 +91,101 @@ export function Layout({ error, onErrorDismiss, readyModelsCount }: LayoutProps)
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.id}
-              to={item.path}
-              className={({ isActive }) =>
-                clsx(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group",
-                  isActive
-                    ? "bg-[#1a1a1a] border border-[#2a2a2a]"
-                    : "hover:bg-[#161616] border border-transparent"
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div
-                    className={clsx(
-                      "p-2 rounded-lg transition-colors",
-                      isActive
-                        ? "bg-white text-black"
-                        : "bg-[#1f1f1f] text-gray-400 group-hover:text-gray-300"
-                    )}
-                  >
-                    <item.icon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
+        <nav className="flex-1 p-3 overflow-y-auto flex flex-col">
+          <div className="space-y-1">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.id}
+                to={item.path}
+                className={({ isActive }) =>
+                  clsx(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group",
+                    isActive
+                      ? "bg-[#1a1a1a] border border-[#2a2a2a]"
+                      : "hover:bg-[#161616] border border-transparent",
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
                     <div
                       className={clsx(
-                        "text-sm font-medium transition-colors truncate",
-                        isActive ? "text-white" : "text-gray-400 group-hover:text-gray-300"
+                        "p-2 rounded-lg transition-colors",
+                        isActive
+                          ? "bg-white text-black"
+                          : "bg-[#1f1f1f] text-gray-400 group-hover:text-gray-300",
                       )}
                     >
-                      {item.label}
+                      <item.icon className="w-4 h-4" />
                     </div>
-                    <div className="text-xs text-gray-600 truncate">
-                      {item.description}
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={clsx(
+                          "text-sm font-medium transition-colors truncate",
+                          isActive
+                            ? "text-white"
+                            : "text-gray-400 group-hover:text-gray-300",
+                        )}
+                      >
+                        {item.label}
+                      </div>
+                      <div className="text-xs text-gray-600 truncate">
+                        {item.description}
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </NavLink>
-          ))}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+
+          {/* Bottom navigation section */}
+          <div className="mt-auto pt-3 space-y-1 border-t border-[#2a2a2a]">
+            {BOTTOM_NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.id}
+                to={item.path}
+                className={({ isActive }) =>
+                  clsx(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group",
+                    isActive
+                      ? "bg-[#1a1a1a] border border-[#2a2a2a]"
+                      : "hover:bg-[#161616] border border-transparent",
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div
+                      className={clsx(
+                        "p-2 rounded-lg transition-colors",
+                        isActive
+                          ? "bg-white text-black"
+                          : "bg-[#1f1f1f] text-gray-400 group-hover:text-gray-300",
+                      )}
+                    >
+                      <item.icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={clsx(
+                          "text-sm font-medium transition-colors truncate",
+                          isActive
+                            ? "text-white"
+                            : "text-gray-400 group-hover:text-gray-300",
+                        )}
+                      >
+                        {item.label}
+                      </div>
+                      <div className="text-xs text-gray-600 truncate">
+                        {item.description}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
         </nav>
 
         {/* Footer */}
@@ -136,7 +195,8 @@ export function Layout({ error, onErrorDismiss, readyModelsCount }: LayoutProps)
               {readyModelsCount > 0 ? (
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                  {readyModelsCount} model{readyModelsCount !== 1 ? "s" : ""} loaded
+                  {readyModelsCount} model{readyModelsCount !== 1 ? "s" : ""}{" "}
+                  loaded
                 </span>
               ) : (
                 <span className="text-gray-600">No models loaded</span>
